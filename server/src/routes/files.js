@@ -128,6 +128,16 @@ router.get('/download-raw/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+router.put('/:id', agencyOnly, async (req, res) => {
+  try {
+    const { name } = req.body
+    if (!name) return res.status(400).json({ error: 'File name is required' })
+    const file = await File.findByIdAndUpdate(req.params.id, { name }, { new: true })
+    if (!file) return res.status(404).json({ error: 'File not found' })
+    res.json(enrichFile(file))
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 router.delete('/:id', agencyOnly, async (req, res) => {
   try {
     const file = await File.findByIdAndUpdate(req.params.id, { deletedAt: new Date() })

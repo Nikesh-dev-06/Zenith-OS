@@ -21,7 +21,11 @@ export default function LoginPage() {
       await login(email, password)
       navigate('/dashboard')
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Invalid credentials. Please try again.')
+      if (!err?.response) {
+        setError('Network/CORS error: Cannot reach the backend server. Please verify that the backend is running.')
+      } else {
+        setError(err.response.data?.error || 'Invalid credentials. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -38,8 +42,12 @@ export default function LoginPage() {
       const creds = defaultCredentials[role]
       await login(creds.email, creds.password)
       navigate(role === 'client' ? '/portal' : '/dashboard')
-    } catch (err) {
-      setError('Demo login failed. Please use a real account.')
+    } catch (err: any) {
+      if (!err?.response) {
+        setError('Network/CORS error: Cannot reach the backend server. Please verify that the backend is running.')
+      } else {
+        setError(err.response.data?.error || 'Demo login failed. Please use a real account.')
+      }
     } finally {
       setLoading(false)
     }

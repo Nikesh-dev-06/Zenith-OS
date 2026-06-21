@@ -12,7 +12,16 @@ const app = express()
 // ── Security Middleware ──────────────────────────────
 app.use(helmet())
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true)
+    const isLocalhost = /^https?:\/\/localhost(:\d+)?$/.test(origin)
+    const isClientUrl = origin === process.env.CLIENT_URL
+    if (isLocalhost || isClientUrl) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
   credentials: true,
 }))
 app.use(express.json({ limit: '10mb' }))
@@ -20,9 +29,10 @@ app.use(express.urlencoded({ extended: true }))
 app.use(morgan('dev'))
 
 // Rate limiting
+const isDev = process.env.NODE_ENV !== 'production'
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: isDev ? 10000 : 100, // 10,000 requests in dev, 100 in production
   message: { error: 'Too many requests, please try again later.' },
 })
 app.use('/api', limiter)
@@ -30,7 +40,7 @@ app.use('/api', limiter)
 // Auth rate limiter (stricter)
 const authLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,
+  max: isDev ? 1000 : 10, // 1,000 requests in dev, 10 in production
   message: { error: 'Too many login attempts. Please try again later.' },
 })
 

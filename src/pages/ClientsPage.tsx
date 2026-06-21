@@ -88,6 +88,11 @@ export default function ClientsPage() {
       alert('Please fill in all required fields.')
       return
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(newEmail)) {
+      alert('Please enter a valid email address.')
+      return
+    }
     const payload = {
       companyName: newCompany,
       contactPerson: newContact,
@@ -152,9 +157,6 @@ export default function ClientsPage() {
 
   // SPA full details content
   const renderDetailView = (client: Client) => {
-    const clientProjects = mockProjects.filter(p => p.clientId === client.id)
-    const clientInvoices = mockInvoices.filter(i => i.clientId === client.id)
-    
     // Gather related activities
     const projectIds = clientProjects.map(p => p.id)
     const filteredLogs = clientLogs.filter(log => 
@@ -605,43 +607,90 @@ export default function ClientsPage() {
 
           {/* Add Client Modal */}
           <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add New Client">
-            <div className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleCreateClient(); }} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Company Name *</label>
-                  <input className="input py-2 text-sm" placeholder="Acme Corp" value={newCompany} onChange={e => setNewCompany(e.target.value)} />
+                  <label htmlFor="client-company-name" className="block text-xs font-semibold text-slate-700 mb-1">Company Name *</label>
+                  <input
+                    id="client-company-name"
+                    name="companyName"
+                    type="text"
+                    required
+                    className="input py-2 text-sm"
+                    placeholder="Acme Corp"
+                    value={newCompany}
+                    onChange={e => setNewCompany(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Contact Person *</label>
-                  <input className="input py-2 text-sm" placeholder="John Doe" value={newContact} onChange={e => setNewContact(e.target.value)} />
+                  <label htmlFor="client-contact-person" className="block text-xs font-semibold text-slate-700 mb-1">Contact Person *</label>
+                  <input
+                    id="client-contact-person"
+                    name="contactPerson"
+                    type="text"
+                    required
+                    className="input py-2 text-sm"
+                    placeholder="John Doe"
+                    value={newContact}
+                    onChange={e => setNewContact(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Email *</label>
-                  <input type="email" className="input py-2 text-sm" placeholder="john@acme.com" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+                  <label htmlFor="client-email" className="block text-xs font-semibold text-slate-700 mb-1">Email *</label>
+                  <input
+                    id="client-email"
+                    name="email"
+                    type="email"
+                    required
+                    className="input py-2 text-sm"
+                    placeholder="john@acme.com"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
-                  <input className="input py-2 text-sm" placeholder="+91 99999 00000" value={newPhone} onChange={e => setNewPhone(e.target.value)} />
+                  <label htmlFor="client-phone" className="block text-xs font-semibold text-slate-700 mb-1">Phone</label>
+                  <input
+                    id="client-phone"
+                    name="phone"
+                    type="tel"
+                    className="input py-2 text-sm"
+                    placeholder="+91 99999 00000"
+                    value={newPhone}
+                    onChange={e => setNewPhone(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Industry</label>
-                  <select className="input py-2 text-sm" value={newIndustry} onChange={e => setNewIndustry(e.target.value)}>
-                    <option>Technology</option>
-                    <option>Hospitality</option>
-                    <option>FMCG</option>
-                    <option>Real Estate</option>
-                    <option>Education</option>
-                    <option>Media</option>
-                    <option>Other</option>
+                  <label htmlFor="client-industry" className="block text-xs font-semibold text-slate-700 mb-1">Industry</label>
+                  <select
+                    id="client-industry"
+                    name="industry"
+                    className="input py-2 text-sm"
+                    value={newIndustry}
+                    onChange={e => setNewIndustry(e.target.value)}
+                  >
+                    <option value="Technology">Technology</option>
+                    <option value="Hospitality">Hospitality</option>
+                    <option value="FMCG">FMCG</option>
+                    <option value="Real Estate">Real Estate</option>
+                    <option value="Education">Education</option>
+                    <option value="Media">Media</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
-                  <select className="input py-2 text-sm" value={newStatus} onChange={e => setNewStatus(e.target.value as ClientStatus)}>
+                  <label htmlFor="client-status" className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+                  <select
+                    id="client-status"
+                    name="status"
+                    className="input py-2 text-sm"
+                    value={newStatus}
+                    onChange={e => setNewStatus(e.target.value as ClientStatus)}
+                  >
                     <option value="lead">Lead</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -650,25 +699,48 @@ export default function ClientsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Address</label>
-                  <input className="input py-2 text-sm" placeholder="City, State" value={newAddress} onChange={e => setNewAddress(e.target.value)} />
+                  <label htmlFor="client-address" className="block text-xs font-semibold text-slate-700 mb-1">Address</label>
+                  <input
+                    id="client-address"
+                    name="address"
+                    type="text"
+                    className="input py-2 text-sm"
+                    placeholder="City, State"
+                    value={newAddress}
+                    onChange={e => setNewAddress(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">GSTIN</label>
-                  <input className="input py-2 text-sm" placeholder="e.g. 29AAACN1234F1Z0" value={newGstin} onChange={e => setNewGstin(e.target.value)} />
+                  <label htmlFor="client-gstin" className="block text-xs font-semibold text-slate-700 mb-1">GSTIN</label>
+                  <input
+                    id="client-gstin"
+                    name="gstin"
+                    type="text"
+                    className="input py-2 text-sm"
+                    placeholder="e.g. 29AAACN1234F1Z0"
+                    value={newGstin}
+                    onChange={e => setNewGstin(e.target.value)}
+                  />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Notes</label>
-                <textarea className="input py-2 h-20 resize-none text-sm" placeholder="Any important notes about this client..." value={newNotes} onChange={e => setNewNotes(e.target.value)} />
+                <label htmlFor="client-notes" className="block text-xs font-semibold text-slate-700 mb-1">Notes</label>
+                <textarea
+                  id="client-notes"
+                  name="notes"
+                  className="input py-2 h-20 resize-none text-sm"
+                  placeholder="Any important notes about this client..."
+                  value={newNotes}
+                  onChange={e => setNewNotes(e.target.value)}
+                />
               </div>
               <div className="flex gap-3 pt-2">
-                <button className="btn-secondary flex-1 cursor-pointer" onClick={() => setShowAdd(false)}>Cancel</button>
-                <button className="btn-primary flex-1 justify-center cursor-pointer" onClick={handleCreateClient}>
+                <button type="button" className="btn-secondary flex-1 cursor-pointer" onClick={() => setShowAdd(false)}>Cancel</button>
+                <button type="submit" className="btn-primary flex-1 justify-center cursor-pointer">
                   <Plus size={15} /> Create Client
                 </button>
               </div>
-            </div>
+            </form>
           </Modal>
         </div>
       )}
