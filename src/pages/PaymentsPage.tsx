@@ -1,25 +1,81 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CreditCard, Smartphone, Building2, CheckCircle, IndianRupee } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Avatar, Modal } from '../components/ui/index'
-import { mockPayments, mockInvoices } from '../lib/mockData'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
+import api from '../lib/api'
 
 export default function PaymentsPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'super_admin'
+
+  const [payments, setPayments] = useState<any[]>([])
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
   const [showRazorpay, setShowRazorpay] = useState(false)
   const [payStep, setPayStep] = useState<'method' | 'processing' | 'success'>('method')
   const [selectedMethod, setSelectedMethod] = useState<string>('')
+  
+  // Payment target states
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
+  const [paymentOrderId, setPaymentOrderId] = useState<string>('')
 
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'super_admin'
-  const totalCollected = mockPayments.reduce((s, p) => s + p.amount, 0)
-  const pendingInvoices = mockInvoices.filter(i => i.status === 'sent' || i.status === 'overdue')
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const [paymentsRes, invoicesRes] = await Promise.all([
+        api.get('/payments'),
+        api.get('/invoices?limit=100')
+      ])
+      setPayments(paymentsRes.data || [])
+      setInvoices(invoicesRes.data.invoices || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
+  useEffect(() => {
+    fetchData()
+  }, [])
 
-  const handlePay = () => {
+  const totalCollected = payments.reduce((s, p) => s + p.amount, 0)
+  const pendingInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue')
+  const overdueInvoices = invoices.filter(i => i.status === 'overdue')
+
+  const handleStartPayment = async (inv: any) => {
+    try {
+      setSelectedInvoice(inv)
+      const res = await api.post('/payments/create-order', { invoiceId: inv.id })
+      setPaymentOrderId(res.data.order.id)
+      setPayStep('method')
+      setShowRazorpay(true)
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message)
+    }
+  }
+
+  const handlePay = async () => {
+    if (!selectedMethod || !selectedInvoice) return
     setPayStep('processing')
-    setTimeout(() => setPayStep('success'), 2000)
+    try {
+      await api.post('/payments/verify', {
+        razorpayOrderId: paymentOrderId,
+        razorpayPaymentId: `pay_${Math.random().toString(36).substring(2, 11)}`,
+        razorpaySignature: 'mock_signature',
+        invoiceId: selectedInvoice.id
+      })
+      setTimeout(() => {
+        setPayStep('success')
+        fetchData()
+      }, 1500)
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message)
+      setPayStep('method')
+    }
   }
 
   const methods = [
@@ -28,11 +84,21 @@ export default function PaymentsPage() {
     { id: 'netbanking', label: 'Net Banking', icon: <Building2 size={18} />, desc: 'All major banks' },
   ]
 
+  if (loading) {
+    return (
+      <Layout title="Payments">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600" />
+        </div>
+      </Layout>
+    )
+  }
+
   return (
     <Layout title="Payments">
       <div className="page-header">
         <h1 className="page-title">Payments</h1>
-        <p className="page-subtitle">{mockPayments.length} transactions recorded</p>
+        <p className="page-subtitle">{payments.length} transactions recorded</p>
       </div>
 
       {/* Summary */}
@@ -50,7 +116,7 @@ export default function PaymentsPage() {
         <div className="card p-5 text-center">
           <p className="text-xs text-slate-500 mb-1">Overdue</p>
           <p className="text-2xl font-bold text-rose-600">
-            {formatCurrency(mockInvoices.filter(i => i.status === 'overdue').reduce((s, i) => s + i.total, 0))}
+            {formatCurrency(overdueInvoices.reduce((s, i) => s + i.total, 0))}
           </p>
         </div>
       </div>
@@ -76,7 +142,7 @@ export default function PaymentsPage() {
                   {!isAdmin && (
                     <button
                       className="btn-primary py-2"
-                      onClick={() => { setShowRazorpay(true); setPayStep('method') }}
+                      onClick={() => handleStartPayment(inv)}
                     >
                       <IndianRupee size={14} /> Pay Now
                     </button>
@@ -91,7 +157,7 @@ export default function PaymentsPage() {
       {/* Transaction History */}
       <div>
         <h2 className="section-title mb-4">Transaction History</h2>
-        {mockPayments.length === 0 ? (
+        {payments.length === 0 ? (
           <div className="card p-8 text-center text-slate-400 text-sm">No transactions yet.</div>
         ) : (
           <div className="card overflow-hidden">
@@ -108,7 +174,7 @@ export default function PaymentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {mockPayments.map(payment => (
+                {payments.map(payment => (
                   <tr key={payment.id} className="table-row">
                     <td className="table-cell">
                       <p className="text-xs font-mono text-slate-500">{payment.transactionId}</p>
@@ -125,6 +191,7 @@ export default function PaymentsPage() {
                         {payment.method === 'UPI' && <Smartphone size={13} className="text-slate-400" />}
                         {payment.method === 'Bank Transfer' && <Building2 size={13} className="text-slate-400" />}
                         {payment.method === 'Card' && <CreditCard size={13} className="text-slate-400" />}
+                        {payment.method === 'Razorpay' && <CreditCard size={13} className="text-slate-400" />}
                         {payment.method}
                       </div>
                     </td>
@@ -133,7 +200,7 @@ export default function PaymentsPage() {
                     </td>
                     <td className="table-cell text-sm text-slate-500">{formatDate(payment.paidAt)}</td>
                     <td className="table-cell">
-                      {payment.paidAt ? (
+                      {payment.status === 'success' ? (
                         <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
                           <CheckCircle size={12} /> Paid
                         </span>
@@ -153,13 +220,13 @@ export default function PaymentsPage() {
 
       {/* Razorpay Payment Modal */}
       <Modal open={showRazorpay} onClose={() => { setShowRazorpay(false); setPayStep('method') }} title="Complete Payment" size="sm">
-        {payStep === 'method' && (
+        {payStep === 'method' && selectedInvoice && (
           <div className="space-y-4">
             {/* Razorpay branding */}
             <div className="bg-slate-50 rounded-xl p-4 text-center">
               <p className="text-xs text-slate-500 mb-1">Paying</p>
-              <p className="text-2xl font-bold text-navy-900">₹1,41,600</p>
-              <p className="text-xs text-slate-400 mt-0.5">INV-2024-002 · Meridian Hospitality</p>
+              <p className="text-2xl font-bold text-navy-900">{formatCurrency(selectedInvoice.total)}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{selectedInvoice.invoiceNumber} · {selectedInvoice.clientName}</p>
             </div>
 
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Choose payment method</p>
@@ -169,7 +236,7 @@ export default function PaymentsPage() {
                 <button
                   key={m.id}
                   onClick={() => setSelectedMethod(m.id)}
-                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all
+                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all cursor-pointer
                     ${selectedMethod === m.id
                       ? 'border-orange-400 bg-orange-50'
                       : 'border-slate-200 hover:border-slate-300'
@@ -197,15 +264,15 @@ export default function PaymentsPage() {
                 <rect x="3" y="11" width="18" height="11" rx="2" stroke="#94a3b8" strokeWidth="2"/>
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#94a3b8" strokeWidth="2"/>
               </svg>
-              Secured by Razorpay
+              Secured by Razorpay (Mock Mode)
             </div>
 
             <button
-              className="btn-primary w-full justify-center py-3"
+              className="btn-primary w-full justify-center py-3 cursor-pointer"
               disabled={!selectedMethod}
               onClick={handlePay}
             >
-              Pay ₹1,41,600
+              Pay {formatCurrency(selectedInvoice.total)}
             </button>
           </div>
         )}
@@ -221,18 +288,18 @@ export default function PaymentsPage() {
           </div>
         )}
 
-        {payStep === 'success' && (
+        {payStep === 'success' && selectedInvoice && (
           <div className="text-center py-8">
             <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}>
               <CheckCircle size={32} className="text-white" />
             </div>
             <p className="text-xl font-bold text-navy-900 mb-1">Payment Successful!</p>
-            <p className="text-sm text-slate-500 mb-1">₹1,41,600 received</p>
-            <p className="text-xs text-slate-400 mb-6">A receipt has been sent to priya@meridian.in</p>
+            <p className="text-sm text-slate-500 mb-1">{formatCurrency(selectedInvoice.total)} received</p>
+            <p className="text-xs text-slate-400 mb-6">A mock receipt has been generated.</p>
             <button
-              className="btn-primary justify-center w-full"
-              onClick={() => { setShowRazorpay(false); setPayStep('method') }}
+              className="btn-primary justify-center w-full cursor-pointer"
+              onClick={() => { setShowRazorpay(false); setPayStep('method'); setSelectedInvoice(null); }}
             >
               Done
             </button>

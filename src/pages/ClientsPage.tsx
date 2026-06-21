@@ -1,16 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Plus, Search, Filter, Building2, Mail, Phone, FolderOpen,
   IndianRupee, MoreHorizontal, ArrowLeft, Copy, Check, Clock, CheckCircle
 } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { ClientStatusBadge, Avatar, EmptyState, Modal, Progress, InvoiceStatusBadge } from '../components/ui/index'
-import { mockClients, mockProjects, mockInvoices, mockActivityLogs } from '../lib/mockData'
 import { formatCurrency, formatRelativeTime } from '../lib/utils'
 import type { Client, ClientStatus } from '../types'
+import api from '../lib/api'
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>(mockClients)
+  const [clients, setClients] = useState<Client[]>([])
+  const [loading, setLoading] = useState(true)
+  const [clientProjects, setClientProjects] = useState<any[]>([])
+  const [clientInvoices, setClientInvoices] = useState<any[]>([])
+  const [clientLogs, setClientLogs] = useState<any[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   
   // Search and Filter state
@@ -48,13 +52,43 @@ export default function ClientsPage() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
+  const fetchClients = () => {
+    api.get('/clients?limit=100')
+      .then(res => {
+        setClients(res.data.clients)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error(err)
+        setLoading(false)
+      })
+  }
+
+  useEffect(() => {
+    fetchClients()
+  }, [])
+
+  const handleSelectClient = (clientId: string | null) => {
+    setSelectedClientId(clientId)
+    if (clientId) {
+      api.get(`/projects?clientId=${clientId}`).then(res => setClientProjects(res.data.projects || []))
+      api.get(`/invoices?clientId=${clientId}`).then(res => setClientInvoices(res.data.invoices || []))
+      api.get(`/activity`).then(res => {
+        setClientLogs(res.data.logs || [])
+      })
+    } else {
+      setClientProjects([])
+      setClientInvoices([])
+      setClientLogs([])
+    }
+  }
+
   const handleCreateClient = () => {
     if (!newCompany || !newContact || !newEmail) {
       alert('Please fill in all required fields.')
       return
     }
-    const newClient: Client = {
-      id: `c${clients.length + 1}`,
+    const payload = {
       companyName: newCompany,
       contactPerson: newContact,
       email: newEmail,
@@ -64,24 +98,26 @@ export default function ClientsPage() {
       address: newAddress,
       notes: newNotes,
       gstin: newGstin,
-      projectCount: 0,
-      totalRevenue: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
     }
-    setClients([newClient, ...clients])
-    setShowAdd(false)
-    
-    // Clear states
-    setNewCompany('')
-    setNewContact('')
-    setNewEmail('')
-    setNewPhone('')
-    setNewIndustry('Technology')
-    setNewStatus('lead')
-    setNewAddress('')
-    setNewNotes('')
-    setNewGstin('')
+    api.post('/clients', payload)
+      .then(() => {
+        fetchClients()
+        setShowAdd(false)
+        
+        // Clear states
+        setNewCompany('')
+        setNewContact('')
+        setNewEmail('')
+        setNewPhone('')
+        setNewIndustry('Technology')
+        setNewStatus('lead')
+        setNewAddress('')
+        setNewNotes('')
+        setNewGstin('')
+      })
+      .catch(err => {
+        alert(err.response?.data?.error || err.message)
+      })
   }
 
   const filtered = clients.filter(c => {
@@ -121,10 +157,10 @@ export default function ClientsPage() {
     
     // Gather related activities
     const projectIds = clientProjects.map(p => p.id)
-    const clientLogs = mockActivityLogs.filter(log => 
+    const filteredLogs = clientLogs.filter(log => 
       projectIds.includes(log.entityId) || 
       log.userId === client.id || 
-      log.userName.includes(client.contactPerson)
+      log.userName?.includes(client.contactPerson)
     )
 
     // Calculate outstanding
@@ -135,7 +171,7 @@ export default function ClientsPage() {
       <div className="space-y-6 animate-slide-up">
         {/* Back control */}
         <button
-          onClick={() => setSelectedClientId(null)}
+          onClick={() => handleSelectClient(null)}
           className="btn-ghost flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-orange-600 mb-2 px-0 cursor-pointer"
         >
           <ArrowLeft size={12} /> Back to Clients
@@ -323,13 +359,13 @@ export default function ClientsPage() {
             <div className="card p-6">
               <h2 className="section-title mb-4 flex items-center gap-2">
                 <CheckCircle size={16} className="text-orange-600" />
-                <span>Recent History & Activities ({clientLogs.length})</span>
+                <span>Recent History & Activities ({filteredLogs.length})</span>
               </h2>
-              {clientLogs.length === 0 ? (
+              {filteredLogs.length === 0 ? (
                 <p className="text-xs text-slate-400 py-2">No activity recorded for this client.</p>
               ) : (
                 <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                  {clientLogs.map(log => (
+                  {filteredLogs.map(log => (
                     <div key={log.id} className="flex gap-2 text-xs">
                       <Avatar name={log.userName} size="sm" />
                       <div className="flex-1 min-w-0 bg-slate-50/50 p-2 rounded-xl border border-slate-100/50">
@@ -494,7 +530,7 @@ export default function ClientsPage() {
               {filtered.map(client => (
                 <div
                   key={client.id}
-                  onClick={() => setSelectedClientId(client.id)}
+                  onClick={() => handleSelectClient(client.id)}
                   className="card-hover p-5 cursor-pointer group flex flex-col justify-between"
                 >
                   <div>

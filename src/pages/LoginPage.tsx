@@ -20,8 +20,8 @@ export default function LoginPage() {
     try {
       await login(email, password)
       navigate('/dashboard')
-    } catch {
-      setError('Invalid credentials. Please try again.')
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Invalid credentials. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -29,9 +29,20 @@ export default function LoginPage() {
 
   const demoLogin = async (role: 'super_admin' | 'team_member' | 'client') => {
     setLoading(true)
-    await login('', '', role)
-    navigate(role === 'client' ? '/portal' : '/dashboard')
-    setLoading(false)
+    try {
+      const defaultCredentials = {
+        super_admin: { email: 'admin@zenithcreative.in', password: 'password' },
+        team_member: { email: 'team@zenithcreative.in', password: 'password' },
+        client: { email: 'client@novatech.com', password: 'password' },
+      }
+      const creds = defaultCredentials[role]
+      await login(creds.email, creds.password)
+      navigate(role === 'client' ? '/portal' : '/dashboard')
+    } catch (err) {
+      setError('Demo login failed. Please use a real account.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

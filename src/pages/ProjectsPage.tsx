@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Search, Calendar, IndianRupee, CheckSquare, MoreHorizontal, Users } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { ProjectStatusBadge, EmptyState, Modal, Progress, Avatar } from '../components/ui/index'
-import { mockProjects } from '../lib/mockData'
 import { formatCurrency, getDaysUntil } from '../lib/utils'
 import type { ProjectStatus, Project } from '../types'
+import api from '../lib/api'
 
 const STATUS_FILTERS: { label: string; value: ProjectStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -23,14 +23,17 @@ const getUserName = (id: string) => {
 }
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>(mockProjects)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [clients, setClients] = useState<any[]>([])
+  const [usersList, setUsersList] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all')
   const [showAdd, setShowAdd] = useState(false)
 
   // Form states
   const [projectName, setProjectName] = useState('')
-  const [clientName, setClientName] = useState('')
+  const [selectedClientIdForNewProject, setSelectedClientIdForNewProject] = useState('')
   const [description, setDescription] = useState('')
   const [startDate, setStartDate] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -38,40 +41,64 @@ export default function ProjectsPage() {
   const [status, setStatus] = useState<ProjectStatus>('draft')
   const [assignedUser, setAssignedUser] = useState('')
 
+  const fetchProjects = () => {
+    api.get('/projects?limit=100')
+      .then(res => {
+        setProjects(res.data.projects)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error(err)
+        setLoading(false)
+      })
+  }
+
+  useEffect(() => {
+    fetchProjects()
+    api.get('/clients?limit=100').then(res => setClients(res.data.clients || []))
+    api.get('/auth/users').then(res => setUsersList(res.data || []))
+  }, [])
+
+  const getMemberName = (member: any) => {
+    if (typeof member === 'object' && member !== null) {
+      return member.name
+    }
+    const found = usersList.find(u => u.id === member || u._id === member)
+    return found ? found.name : 'Team Member'
+  }
+
   const handleCreateProject = () => {
-    if (!projectName || !clientName || !assignedUser) {
+    if (!projectName || !selectedClientIdForNewProject || !assignedUser) {
       alert('Please fill in all required fields (Project Name, Client, and Assigned User).')
       return
     }
-    const newProj: Project = {
-      id: `p${projects.length + 1}`,
+    const payload = {
       name: projectName,
       description,
-      clientId: 'c1', // default mock Client ID
-      clientName,
+      clientId: selectedClientIdForNewProject,
       startDate: startDate || new Date().toISOString().split('T')[0],
       deadline: deadline || new Date().toISOString().split('T')[0],
       budget: Number(budget) || 0,
       status: status,
-      progress: 0,
       teamMembers: [assignedUser],
-      taskCount: 0,
-      completedTasks: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
     }
-    setProjects([newProj, ...projects])
-    setShowAdd(false)
-
-    // Clear inputs
-    setProjectName('')
-    setClientName('')
-    setDescription('')
-    setStartDate('')
-    setDeadline('')
-    setBudget('')
-    setStatus('draft')
-    setAssignedUser('')
+    api.post('/projects', payload)
+      .then(() => {
+        fetchProjects()
+        setShowAdd(false)
+        // Clear inputs
+        setProjectName('')
+        setSelectedClientIdForNewProject('')
+        setDescription('')
+        setStartDate('')
+        setDeadline('')
+        setBudget('')
+        setStatus('draft')
+        setAssignedUser('')
+      })
+      .catch(err => {
+        alert(err.response?.data?.error || err.message)
+      })
   }
 
   const filtered = projects.filter(p => {
@@ -184,13 +211,13 @@ export default function ProjectsPage() {
 
   {/* Assigned User Below Stats */}
   <div className="w-auto flex flex-col gap-1">
-    {project.teamMembers.slice(0, 2).map((memberId) => (
+    {project.teamMembers.slice(0, 2).map((member: any) => (
       <div
-        key={memberId}
+        key={typeof member === 'object' ? member.id : member}
         className="border border-slate-200 rounded-md px-3 py-1.5 bg-slate-50 hover:bg-slate-100 cursor-pointer text-center min-w-[180px]"
       >
         <span className="text-xs font-medium text-slate-900">
-          {getUserName(memberId)}
+          {getMemberName(member)}
         </span>
       </div>
     ))}
@@ -214,10 +241,10 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Client *</label>
-              <select className="input text-sm py-2" value={clientName} onChange={e => setClientName(e.target.value)}>
+              <select className="input text-sm py-2" value={selectedClientIdForNewProject} onChange={e => setSelectedClientIdForNewProject(e.target.value)}>
                 <option value="">Select client...</option>
-                {mockProjects.map(p => p.clientName).filter((v, i, a) => a.indexOf(v) === i).map(name => (
-                  <option key={name} value={name}>{name}</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>{client.companyName}</option>
                 ))}
               </select>
             </div>
@@ -227,9 +254,9 @@ export default function ProjectsPage() {
               <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned User *</label>
               <select className="input text-sm py-2" value={assignedUser} onChange={e => setAssignedUser(e.target.value)}>
                 <option value="">Select responsible user...</option>
-                <option value="u1">Divya Menon (Admin)</option>
-                <option value="u2">Rahul Iyer (Team)</option>
-                <option value="u3">Sneha Bhat (Team)</option>
+                {usersList.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role.replace('_', ' ')})</option>
+                ))}
               </select>
             </div>
           </div>

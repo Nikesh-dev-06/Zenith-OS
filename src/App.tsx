@@ -23,7 +23,8 @@ const queryClient = new QueryClient({
 })
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, loading } = useAuth()
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading…</div>
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 

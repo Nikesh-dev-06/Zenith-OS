@@ -5,6 +5,17 @@ const { authenticate, agencyOnly } = require('../middleware/auth')
 
 router.use(authenticate)
 
+const enrichApproval = (appr) => {
+  return {
+    ...appr.toObject(),
+    id: appr._id,
+    projectName: appr.projectId ? appr.projectId.name : 'Unknown Project',
+    clientName: appr.clientId ? appr.clientId.companyName : 'Unknown Client',
+    comment: appr.clientComment,
+    requestedAt: appr.createdAt,
+  }
+}
+
 router.get('/', async (req, res) => {
   try {
     const query = {}
@@ -15,7 +26,7 @@ router.get('/', async (req, res) => {
       .populate('clientId', 'companyName')
       .populate('fileIds', 'name type size')
       .sort({ createdAt: -1 })
-    res.json(approvals)
+    res.json(approvals.map(enrichApproval))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -23,7 +34,11 @@ router.post('/', agencyOnly, async (req, res) => {
   try {
     const approval = await Approval.create({ ...req.body, requestedBy: req.user._id })
     await ActivityLog.create({ action: 'requested approval', entityType: 'approval', entityId: approval._id, entityName: approval.title, userId: req.user._id })
-    res.status(201).json(approval)
+    const populated = await Approval.findById(approval._id)
+      .populate('projectId', 'name')
+      .populate('clientId', 'companyName')
+      .populate('fileIds', 'name type size')
+    res.status(201).json(enrichApproval(populated))
   } catch (err) { res.status(400).json({ error: err.message }) }
 })
 
@@ -31,10 +46,14 @@ router.put('/:id/respond', async (req, res) => {
   try {
     const { status, clientComment } = req.body
     const approval = await Approval.findByIdAndUpdate(req.params.id, { status, clientComment, respondedAt: new Date() }, { new: true })
+      .populate('projectId', 'name')
+      .populate('clientId', 'companyName')
+      .populate('fileIds', 'name type size')
     if (!approval) return res.status(404).json({ error: 'Approval not found' })
     await ActivityLog.create({ action: `responded to approval: ${status}`, entityType: 'approval', entityId: approval._id, entityName: approval.title, userId: req.user._id })
-    res.json(approval)
+    res.json(enrichApproval(approval))
   } catch (err) { res.status(400).json({ error: err.message }) }
 })
 
 module.exports = router
+

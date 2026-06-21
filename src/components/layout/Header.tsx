@@ -1,13 +1,26 @@
+import { useState, useEffect } from 'react'
 import { Bell, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { mockNotifications } from '../../lib/mockData'
+import { useAuth } from '../../context/AuthContext'
+import api from '../../lib/api'
 
 interface HeaderProps {
   title?: string
 }
 
 export function Header({ title }: HeaderProps) {
-  const unread = mockNotifications.filter(n => !n.read).length
+  const { user } = useAuth()
+  const [unread, setUnread] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    api.get('/notifications')
+      .then(res => {
+        const list = res.data || []
+        setUnread(list.filter((n: any) => !n.read).length)
+      })
+      .catch(err => console.error(err))
+  }, [user])
 
   return (
     <header className="h-16 bg-white border-b border-slate-100 flex items-center px-6 gap-4 sticky top-0 z-30">

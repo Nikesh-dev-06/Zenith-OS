@@ -1,18 +1,48 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CheckCircle, XCircle, Clock, MessageSquare, FileText } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { ApprovalStatusBadge, EmptyState, Modal } from '../components/ui/index'
-import { mockApprovals } from '../lib/mockData'
 import { formatRelativeTime } from '../lib/utils'
 import type { ApprovalStatus } from '../types'
+import api from '../lib/api'
 
 export default function ApprovalsPage() {
   const [filter, setFilter] = useState<ApprovalStatus | 'all'>('all')
   const [selected, setSelected] = useState<string | null>(null)
   const [comment, setComment] = useState('')
+  const [approvals, setApprovals] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filtered = mockApprovals.filter(a => filter === 'all' || a.status === filter)
-  const selectedApproval = mockApprovals.find(a => a.id === selected)
+  const fetchApprovals = () => {
+    api.get('/approvals')
+      .then(res => {
+        setApprovals(res.data)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error(err)
+        setLoading(false)
+      })
+  }
+
+  useEffect(() => {
+    fetchApprovals()
+  }, [])
+
+  const handleRespond = (id: string, status: 'approved' | 'revision_requested') => {
+    api.put(`/approvals/${id}/respond`, { status, clientComment: comment })
+      .then(() => {
+        fetchApprovals()
+        setSelected(null)
+        setComment('')
+      })
+      .catch(err => {
+        alert(err.response?.data?.error || err.message)
+      })
+  }
+
+  const filtered = approvals.filter(a => filter === 'all' || a.status === filter)
+  const selectedApproval = approvals.find(a => a.id === selected)
 
   const statusMap: Record<ApprovalStatus, string> = {
     pending_review: 'Pending Review',
@@ -24,7 +54,7 @@ export default function ApprovalsPage() {
     <Layout title="Approvals">
       <div className="page-header">
         <h1 className="page-title">Approvals</h1>
-        <p className="page-subtitle">{mockApprovals.filter(a => a.status === 'pending_review').length} pending client approvals</p>
+        <p className="page-subtitle">{approvals.filter(a => a.status === 'pending_review').length} pending client approvals</p>
       </div>
 
       {/* Filters */}
@@ -33,7 +63,7 @@ export default function ApprovalsPage() {
           <button key={s} onClick={() => setFilter(s)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${filter === s ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
             {s === 'all' ? 'All' : statusMap[s]}
-            {s !== 'all' && <span className="ml-1.5 text-xs">({mockApprovals.filter(a => a.status === s).length})</span>}
+            {s !== 'all' && <span className="ml-1.5 text-xs">({approvals.filter(a => a.status === s).length})</span>}
           </button>
         ))}
       </div>
@@ -69,13 +99,13 @@ export default function ApprovalsPage() {
                     <div className="flex gap-2 mt-3">
                       <button
                         className="btn-secondary text-xs py-1.5 px-3 text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                        onClick={e => { e.stopPropagation(); setSelected(approval.id) }}
+                        onClick={e => { e.stopPropagation(); handleRespond(approval.id, 'approved') }}
                       >
                         <CheckCircle size={13} /> Approve
                       </button>
                       <button
                         className="btn-secondary text-xs py-1.5 px-3 text-rose-600 border-rose-200 hover:bg-rose-50"
-                        onClick={e => { e.stopPropagation(); setSelected(approval.id) }}
+                        onClick={e => { e.stopPropagation(); handleRespond(approval.id, 'revision_requested') }}
                       >
                         <XCircle size={13} /> Request Changes
                       </button>
@@ -101,15 +131,19 @@ export default function ApprovalsPage() {
               <p className="text-sm text-slate-600">{selectedApproval.description}</p>
             </div>
 
-            {/* Files */}
-            <div className="bg-slate-50 rounded-xl p-3">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Attached Files</p>
-              <div className="flex items-center gap-2.5 p-2 bg-white rounded-lg border border-slate-100">
-                <FileText size={16} className="text-rose-500" />
-                <span className="text-sm text-navy-900 font-medium flex-1">Brand_Guidelines_v2.pdf</span>
-                <button className="text-xs text-orange-600 font-semibold hover:underline">Download</button>
+            {/* Files (if any) */}
+            {selectedApproval.fileIds && selectedApproval.fileIds.length > 0 && (
+              <div className="bg-slate-50 rounded-xl p-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Attached Files</p>
+                {selectedApproval.fileIds.map((file: any) => (
+                  <div key={file._id || file.id} className="flex items-center gap-2.5 p-2 bg-white rounded-lg border border-slate-100 mb-1.5">
+                    <FileText size={16} className="text-rose-500" />
+                    <span className="text-sm text-navy-900 font-medium flex-1">{file.name}</span>
+                    <button className="text-xs text-orange-600 font-semibold hover:underline" onClick={() => window.open(`http://localhost:5000/api/files/download-raw/${file._id || file.id}`, '_blank')}>Download</button>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
 
             {selectedApproval.comment && (
               <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
@@ -128,10 +162,10 @@ export default function ApprovalsPage() {
                   placeholder="Leave a note with your decision..."
                 />
                 <div className="flex gap-3 mt-3">
-                  <button className="flex-1 btn-secondary text-emerald-600 border-emerald-200 hover:bg-emerald-50 justify-center" onClick={() => setSelected(null)}>
+                  <button className="flex-1 btn-secondary text-emerald-600 border-emerald-200 hover:bg-emerald-50 justify-center" onClick={() => handleRespond(selectedApproval.id, 'approved')}>
                     <CheckCircle size={15} /> Approve
                   </button>
-                  <button className="flex-1 btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 justify-center" onClick={() => setSelected(null)}>
+                  <button className="flex-1 btn-secondary text-rose-600 border-rose-200 hover:bg-rose-50 justify-center" onClick={() => handleRespond(selectedApproval.id, 'revision_requested')}>
                     <XCircle size={15} /> Request Revision
                   </button>
                 </div>
@@ -143,3 +177,4 @@ export default function ApprovalsPage() {
     </Layout>
   )
 }
+

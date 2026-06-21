@@ -1,14 +1,29 @@
 const express = require('express')
 const router = express.Router()
 const multer = require('multer')
-const { File, ActivityLog } = require('../models')
+const path = require('path')
+const fs = require('fs')
+const { File, ActivityLog, Project } = require('../models')
 const { authenticate, agencyOnly } = require('../middleware/auth')
 
 router.use(authenticate)
 
-// Memory storage for demo; swap for multer-s3 in production
+const uploadsDir = path.resolve(__dirname, '../../uploads')
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true })
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir)
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`)
+  }
+})
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage,
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
   fileFilter: (req, file, cb) => {
     const allowed = ['image/jpeg', 'image/png', 'application/pdf', 'application/zip',
@@ -23,24 +38,53 @@ const upload = multer({
   },
 })
 
+const enrichFile = (file) => {
+  return {
+    ...file.toObject(),
+    id: file._id,
+    uploadedByName: file.uploadedBy ? file.uploadedBy.name : 'Unknown User',
+    url: `http://localhost:5000/api/files/download-raw/${file._id}`,
+  }
+}
+
 router.get('/', async (req, res) => {
   try {
     const query = { deletedAt: null }
-    if (req.query.projectId) query.projectId = req.query.projectId
+    const { projectId } = req.query
+
+    if (req.user.role === 'client') {
+      query.isClientVisible = true
+      const clientProjects = await Project.find({ clientId: req.user.clientId, deletedAt: null }).select('_id')
+      const projectIds = clientProjects.map(p => p._id)
+      if (projectId) {
+        if (!projectIds.some(id => id.toString() === projectId.toString())) {
+          return res.status(403).json({ error: 'Access denied to this project\'s files' })
+        }
+        query.projectId = projectId
+      } else {
+        query.projectId = { $in: projectIds }
+      }
+    } else {
+      if (projectId) query.projectId = projectId
+    }
+
     const files = await File.find(query).populate('uploadedBy', 'name').sort({ createdAt: -1 })
-    res.json(files)
+    res.json(files.map(enrichFile))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
-router.post('/upload', agencyOnly, upload.array('files', 10), async (req, res) => {
+router.post('/upload', upload.array('files', 10), async (req, res) => {
   try {
     const { projectId, isClientVisible = true } = req.body
     const createdFiles = []
 
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' })
+    }
+
     for (const file of req.files) {
       const ext = file.originalname.split('.').pop().toLowerCase()
-      // In production: upload to S3 and get key
-      const s3Key = `projects/${projectId}/${Date.now()}-${file.originalname}`
+      const s3Key = file.filename
 
       const dbFile = await File.create({
         name: file.originalname,
@@ -49,17 +93,18 @@ router.post('/upload', agencyOnly, upload.array('files', 10), async (req, res) =
         mimeType: file.mimetype,
         size: file.size,
         s3Key,
-        s3Bucket: process.env.AWS_S3_BUCKET || 'zenithos-files',
+        s3Bucket: 'local-disk',
         projectId,
         uploadedBy: req.user._id,
-        isClientVisible: isClientVisible === 'true',
+        isClientVisible: isClientVisible === 'true' || isClientVisible === true,
       })
       createdFiles.push(dbFile)
 
       await ActivityLog.create({ action: 'uploaded file', entityType: 'file', entityId: dbFile._id, entityName: file.originalname, userId: req.user._id })
     }
 
-    res.status(201).json(createdFiles)
+    const populated = await File.find({ _id: { $in: createdFiles.map(f => f._id) } }).populate('uploadedBy', 'name')
+    res.status(201).json(populated.map(enrichFile))
   } catch (err) { res.status(400).json({ error: err.message }) }
 })
 
@@ -67,17 +112,29 @@ router.get('/:id/download', async (req, res) => {
   try {
     const file = await File.findByIdAndUpdate(req.params.id, { $inc: { downloadCount: 1 } }, { new: true })
     if (!file) return res.status(404).json({ error: 'File not found' })
-    // In production: generate signed S3 URL
-    // const url = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: file.s3Bucket, Key: file.s3Key }), { expiresIn: 3600 })
-    res.json({ downloadUrl: `https://placeholder-s3-url/${file.s3Key}`, expiresIn: 3600 })
+    res.json({ downloadUrl: `http://localhost:5000/api/files/download-raw/${file._id}`, expiresIn: 3600 })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+router.get('/download-raw/:id', async (req, res) => {
+  try {
+    const file = await File.findByIdAndUpdate(req.params.id, { $inc: { downloadCount: 1 } }, { new: true })
+    if (!file) return res.status(404).json({ error: 'File not found' })
+    const filePath = path.join(uploadsDir, file.s3Key)
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found on disk' })
+    }
+    res.download(filePath, file.name)
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 router.delete('/:id', agencyOnly, async (req, res) => {
   try {
-    await File.findByIdAndUpdate(req.params.id, { deletedAt: new Date() })
+    const file = await File.findByIdAndUpdate(req.params.id, { deletedAt: new Date() })
+    if (!file) return res.status(404).json({ error: 'File not found' })
     res.json({ message: 'File deleted' })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 module.exports = router
+

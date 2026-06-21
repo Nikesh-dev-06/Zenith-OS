@@ -1,37 +1,60 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { User, UserRole } from '../types'
+import api, { setAuthToken } from '../lib/api'
 
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string, role?: UserRole) => Promise<void>
   logout: () => void
   isAuthenticated: boolean
+  loading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-const DEMO_USERS: User[] = [
-  { id: 'u1', name: 'Divya Menon', email: 'admin@zenithcreative.in', role: 'super_admin', createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'u2', name: 'Rahul Iyer', email: 'team@zenithcreative.in', role: 'team_member', createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'u3', name: 'Arjun Sharma', email: 'client@novatech.com', role: 'client', createdAt: '2024-01-01T00:00:00Z' },
-]
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const login = async (email: string, _password: string, role?: UserRole) => {
-    await new Promise(r => setTimeout(r, 800))
-    let found = DEMO_USERS.find(u => u.email === email)
-    if (!found && role) {
-      found = DEMO_USERS.find(u => u.role === role) || DEMO_USERS[0]
+  useEffect(() => {
+    const token = localStorage.getItem('zenith_token')
+    if (!token) {
+      setLoading(false)
+      return
     }
-    setUser(found || DEMO_USERS[0])
+
+    const fetchCurrentUser = async () => {
+      try {
+        setAuthToken(token)
+        const response = await api.get('/auth/me')
+        setUser(response.data.user)
+      } catch (err) {
+        setAuthToken(null)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCurrentUser()
+  }, [])
+
+  const login = async (email: string, password: string, role?: UserRole) => {
+    const response = await api.post('/auth/login', { email, password })
+    const { token, user: loggedUser } = response.data
+    setAuthToken(token)
+    setUser(loggedUser)
+
+    return loggedUser
   }
 
-  const logout = () => setUser(null)
+  const logout = () => {
+    setAuthToken(null)
+    setUser(null)
+  }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, loading }}>
       {children}
     </AuthContext.Provider>
   )

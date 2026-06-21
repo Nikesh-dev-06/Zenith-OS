@@ -3,10 +3,13 @@ const router = express.Router()
 const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 const { User } = require('../models')
-const { authenticate } = require('../middleware/auth')
+const { authenticate, agencyOnly } = require('../middleware/auth')
 
-const signToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' })
-const signRefresh = (id) => jwt.sign({ id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '30d' })
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_zenith_secret_key'
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'dev_zenith_refresh_key'
+
+const signToken = (id) => jwt.sign({ id }, JWT_SECRET, { expiresIn: '7d' })
+const signRefresh = (id) => jwt.sign({ id }, JWT_REFRESH_SECRET, { expiresIn: '30d' })
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
@@ -41,7 +44,7 @@ router.post('/refresh', async (req, res) => {
     const { refreshToken } = req.body
     if (!refreshToken) return res.status(401).json({ error: 'Refresh token required' })
 
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET)
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET)
     const user = await User.findById(decoded.id).select('+refreshToken')
     if (!user || user.refreshToken !== refreshToken) {
       return res.status(401).json({ error: 'Invalid refresh token' })
@@ -63,6 +66,16 @@ router.post('/logout', authenticate, async (req, res) => {
 // GET /api/auth/me
 router.get('/me', authenticate, (req, res) => {
   res.json({ user: req.user })
+})
+
+// GET /api/auth/users
+router.get('/users', authenticate, agencyOnly, async (req, res) => {
+  try {
+    const users = await User.find({ isActive: true }).select('name email role')
+    res.json(users)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
 })
 
 // POST /api/auth/forgot-password

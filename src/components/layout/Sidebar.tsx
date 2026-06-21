@@ -8,7 +8,8 @@ import {
 import { Logo } from '../ui/Logo'
 import { Avatar } from '../ui/index'
 import { useAuth } from '../../context/AuthContext'
-import { mockNotifications } from '../../lib/mockData'
+import api from '../../lib/api'
+import { useEffect } from 'react'
 
 const agencyNav = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
@@ -36,7 +37,18 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const unread = mockNotifications.filter(n => !n.read).length
+  const [unread, setUnread] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    api.get('/notifications')
+      .then(res => {
+        const list = res.data || []
+        setUnread(list.filter((n: any) => !n.read).length)
+      })
+      .catch(err => console.error(err))
+  }, [user])
+
   const nav = user?.role === 'client' ? clientNav : agencyNav
 
   const handleLogout = () => {

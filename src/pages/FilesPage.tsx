@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Upload, Search, Download, Eye, Edit, FileText, Image, Archive } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Avatar, EmptyState, Modal } from '../components/ui/index'
-import { mockFiles, mockProjects, currentUser } from '../lib/mockData'
 import { formatFileSize, formatDate, getFileIcon } from '../lib/utils'
+import api from '../lib/api'
 
 const FILE_TYPE_COLORS: Record<string, string> = {
   pdf: 'bg-rose-50 text-rose-600',
@@ -22,17 +22,72 @@ export default function FilesPage() {
   const [dragOver, setDragOver] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState('')
   const [showEdit, setShowEdit] = useState(false)
   const [editFile, setEditFile] = useState<any>(null)
   const [showView, setShowView] = useState(false)
   const [viewFile, setViewFile] = useState<any>(null)
-  const [showVersionPrompt, setShowVersionPrompt] = useState(false)
-  const [pendingFile, setPendingFile] = useState<any>(null)
-  const [files, setFiles] = useState(mockFiles)
+  const [files, setFiles] = useState<any[]>([])
+  const [projectsList, setProjectsList] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchFiles = () => {
+    api.get('/files')
+      .then(res => {
+        setFiles(res.data)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error(err)
+        setLoading(false)
+      })
+  }
+
+  useEffect(() => {
+    fetchFiles()
+    api.get('/projects?limit=100').then(res => {
+      setProjectsList(res.data.projects || [])
+    })
+  }, [])
+
+  const handleUpload = () => {
+    if (!uploadFile || !selectedProjectId) {
+      alert('Please select a file and a project to upload.')
+      return
+    }
+    const formData = new FormData()
+    formData.append('files', uploadFile)
+    formData.append('projectId', selectedProjectId)
+    formData.append('isClientVisible', 'true')
+
+    api.post('/files/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+      .then(() => {
+        fetchFiles()
+        setShowUpload(false)
+        setUploadFile(null)
+        setSelectedProjectId('')
+      })
+      .catch(err => {
+        alert(err.response?.data?.error || err.message)
+      })
+  }
+
+  const handleDeleteFile = (id: string) => {
+    if (!confirm('Are you sure you want to delete this file?')) return
+    api.delete(`/files/${id}`)
+      .then(() => {
+        fetchFiles()
+      })
+      .catch(err => {
+        alert(err.response?.data?.error || err.message)
+      })
+  }
 
   const filtered = files.filter(f =>
     f.name.toLowerCase().includes(search.toLowerCase()) ||
-    f.uploadedByName.toLowerCase().includes(search.toLowerCase())
+    f.uploadedByName?.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -54,6 +109,7 @@ export default function FilesPage() {
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={() => setDragOver(false)}
+        onClick={() => setShowUpload(true)}
       >
         <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(244,81,30,0.1), rgba(255,140,66,0.1))' }}>
           <Upload size={20} style={{ color: '#F4511E' }} />
@@ -76,13 +132,19 @@ export default function FilesPage() {
           {/* View Modal */}
           {showView && viewFile && (
             <Modal open={true} onClose={() => setShowView(false)} title="File Details" size="sm">
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <p><strong>Name:</strong> {viewFile.name}</p>
                 <p><strong>Type:</strong> {viewFile.type}</p>
                 <p><strong>Size:</strong> {formatFileSize(viewFile.size)}</p>
                 <p><strong>Uploaded By:</strong> {viewFile.uploadedByName}</p>
                 <p><strong>Version:</strong> v{viewFile.version}</p>
                 <p><strong>Date:</strong> {formatDate(viewFile.createdAt)}</p>
+                <button
+                  className="btn-primary w-full justify-center mt-2"
+                  onClick={() => window.open(viewFile.url, '_blank')}
+                >
+                  <Download size={14} /> Download File
+                </button>
               </div>
             </Modal>
           )}
@@ -96,8 +158,12 @@ export default function FilesPage() {
                 <div className="flex gap-3 pt-2">
                   <button className="btn-secondary flex-1" onClick={() => setShowEdit(false)}>Cancel</button>
                   <button className="btn-primary flex-1" onClick={() => {
-                    setFiles(files.map(f => f.id === editFile.id ? editFile : f))
-                    setShowEdit(false)
+                    api.put(`/files/${editFile.id}`, { name: editFile.name })
+                      .then(() => {
+                        fetchFiles()
+                        setShowEdit(false)
+                      })
+                      .catch(err => alert(err.response?.data?.error || err.message))
                   }}>Save</button>
                 </div>
               </div>
@@ -108,74 +174,23 @@ export default function FilesPage() {
           {showUpload && (
             <Modal open={true} onClose={() => setShowUpload(false)} title="Upload File" size="sm">
               <div className="space-y-4">
-                <input type="file" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Project *</label>
+                  <select className="input text-sm py-2" value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)}>
+                    <option value="">Select project...</option>
+                    {projectsList.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">File *</label>
+                  <input type="file" className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
+                </div>
                 <div className="flex gap-3 pt-2">
                   <button className="btn-secondary flex-1" onClick={() => setShowUpload(false)}>Cancel</button>
-                  <button className="btn-primary flex-1" onClick={async () => {
-                    if (!uploadFile) return
-                    const existing = files.find(f => f.name === uploadFile.name)
-                    if (existing) {
-                      setPendingFile({ file: uploadFile, existing })
-                      setShowVersionPrompt(true)
-                    } else {
-                      const newId = `f${files.length + 1}`
-                      const newFile = {
-                        id: newId,
-                        name: uploadFile.name,
-                        type: uploadFile.name.split('.').pop() || 'txt',
-                        size: uploadFile.size,
-                        url: '#',
-                        projectId: 'p1',
-                        uploadedBy: currentUser.id,
-                        uploadedByName: currentUser.name,
-                        version: 1,
-                        downloadCount: 0,
-                        createdAt: new Date().toISOString(),
-                      }
-                      setFiles([newFile, ...files])
-                      setShowUpload(false)
-                    }
-                  }}>Upload</button>
+                  <button className="btn-primary flex-1 justify-center" onClick={handleUpload}>Upload</button>
                 </div>
-              </div>
-            </Modal>
-          )}
-
-          {/* Version Prompt */}
-          {showVersionPrompt && pendingFile && (
-            <Modal open={true} onClose={() => setShowVersionPrompt(false)} title="File Already Exists" size="sm">
-              <p className="mb-4">A file with the same name already exists. Choose an action:</p>
-              <div className="flex gap-3">
-                <button className="btn-secondary flex-1" onClick={() => {
-                  const maxVer = Math.max(...files.filter(f => f.name === pendingFile.file.name).map(f => f.version))
-                  const newId = `f${files.length + 1}`
-                  const newVersionFile = {
-                    id: newId,
-                    name: pendingFile.file.name,
-                    type: pendingFile.file.name.split('.').pop() || 'txt',
-                    size: pendingFile.file.size,
-                    url: '#',
-                    projectId: 'p1',
-                    uploadedBy: currentUser.id,
-                    uploadedByName: currentUser.name,
-                    version: maxVer + 1,
-                    downloadCount: 0,
-                    createdAt: new Date().toISOString(),
-                  }
-                  setFiles([newVersionFile, ...files])
-                  setShowVersionPrompt(false)
-                  setShowUpload(false)
-                }}>Upload as New Version</button>
-                <button className="btn-primary flex-1" onClick={() => {
-                  const existing = pendingFile.existing
-                  existing.size = pendingFile.file.size
-                  existing.uploadedBy = currentUser.id
-                  existing.uploadedByName = currentUser.name
-                  existing.createdAt = new Date().toISOString()
-                  setFiles(files.map(f => f.id === existing.id ? existing : f))
-                  setShowVersionPrompt(false)
-                  setShowUpload(false)
-                }}>Replace Existing</button>
               </div>
             </Modal>
           )}
@@ -196,7 +211,7 @@ export default function FilesPage() {
                 </tr>
               </thead>
               <tbody>
-                {files.map(file => (
+                {filtered.map(file => (
                   <tr key={file.id} className="table-row">
                     <td className="table-cell">
                       <div className="flex items-center gap-3">
@@ -211,14 +226,14 @@ export default function FilesPage() {
                     </td>
                     <td className="table-cell text-sm text-slate-600">
                       {(() => {
-                        const proj = mockProjects.find(p => p.id === file.projectId);
+                        const proj = projectsList.find(p => p.id === file.projectId);
                         return proj ? proj.name : 'Unknown';
                       })()}
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center gap-2">
-                        <Avatar name={file.uploadedByName} size="sm" />
-                        <span className="text-sm text-slate-600">{file.uploadedByName.split(' ')[0]}</span>
+                        <Avatar name={file.uploadedByName || 'User'} size="sm" />
+                        <span className="text-sm text-slate-600">{(file.uploadedByName || 'User').split(' ')[0]}</span>
                       </div>
                     </td>
                     <td className="table-cell text-sm text-slate-600">{formatFileSize(file.size)}</td>
@@ -233,8 +248,11 @@ export default function FilesPage() {
                         <button className="btn-ghost p-1.5 text-slate-400 hover:text-emerald-600" title="Edit" onClick={() => { setEditFile(file); setShowEdit(true); }}>
                           <Edit size={14} />
                         </button>
-                        <button className="btn-ghost p-1.5 text-slate-400 hover:text-orange-600" title="Download">
+                        <button className="btn-ghost p-1.5 text-slate-400 hover:text-orange-600" title="Download" onClick={() => window.open(file.url, '_blank')}>
                           <Download size={14} />
+                        </button>
+                        <button className="btn-ghost p-1.5 text-slate-400 hover:text-rose-600" title="Delete" onClick={() => handleDeleteFile(file.id)}>
+                          <Archive size={14} />
                         </button>
                       </div>
                     </td>
@@ -248,3 +266,4 @@ export default function FilesPage() {
     </Layout>
   )
 }
+

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Users, FolderOpen, IndianRupee, Clock, CheckCircle,
   ArrowLeft, ArrowRight, Eye, EyeOff, Save, RotateCcw, X, Edit3
@@ -7,9 +7,9 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Layout } from '../components/layout/Layout'
 import { StatCard, Avatar, ProjectStatusBadge, InvoiceStatusBadge } from '../components/ui/index'
 import { Progress } from '../components/ui/index'
-import { mockDashboardStats, mockRevenueData, mockProjects, mockActivityLogs, mockInvoices } from '../lib/mockData'
 import { formatCurrency, formatRelativeTime } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
+import api from '../lib/api'
 
 const pieData = [
   { name: 'Active', value: 4, color: '#06B6D4' },
@@ -246,7 +246,37 @@ function StatCardEditorWrapper({
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const stats = mockDashboardStats
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.get('/dashboard')
+      .then(res => {
+        setData(res.data)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error(err)
+        setLoading(false)
+      })
+  }, [])
+
+  const stats = data || {
+    totalClients: 0,
+    activeProjects: 0,
+    monthlyRevenue: 0,
+    outstandingPayments: 0,
+    pendingApprovals: 0,
+    clientGrowth: 0,
+    projectGrowth: 0,
+    revenueGrowth: 0,
+  }
+  const revenueData = data?.revenueData || []
+  const currentPieData = data?.projectStatusBreakdown || pieData
+  const activeProjectsList = data?.activeProjectsList || []
+  const recentActivity = data?.recentActivity || []
+  const overdueInvoices = data?.overdueInvoices || []
+
   const isAdmin = user?.role === 'super_admin'
 
   const [isEditing, setIsEditing] = useState(false)
@@ -477,7 +507,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <ResponsiveContainer width="100%" height={200}>
-                        <AreaChart data={mockRevenueData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
+                        <AreaChart data={revenueData} margin={{ top: 5, right: 5, left: -10, bottom: 0 }}>
                           <defs>
                             <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#F4511E" stopOpacity={0.15} />
@@ -506,13 +536,13 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-center justify-center">
                         <PieChart width={140} height={140}>
-                          <Pie data={pieData} cx={65} cy={65} innerRadius={42} outerRadius={65} paddingAngle={3} dataKey="value">
-                            {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                          <Pie data={currentPieData} cx={65} cy={65} innerRadius={42} outerRadius={65} paddingAngle={3} dataKey="value">
+                            {currentPieData.map((entry: any, i: number) => <Cell key={i} fill={entry.color} />)}
                           </Pie>
                         </PieChart>
                       </div>
                       <div className="space-y-2 mt-4">
-                        {pieData.map(d => (
+                        {currentPieData.map((d: any) => (
                           <div key={d.name} className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
@@ -532,7 +562,7 @@ export default function DashboardPage() {
                         <a href="/projects" className="text-xs font-semibold text-orange-600 hover:underline">View all →</a>
                       </div>
                       <div className="space-y-4">
-                        {mockProjects.filter(p => p.status === 'active' || p.status === 'review').map(project => (
+                        {activeProjectsList.map((project: any) => (
                           <div key={project.id} className="flex items-center gap-4">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1.5">
@@ -559,7 +589,7 @@ export default function DashboardPage() {
                         <a href="/activity" className="text-xs font-semibold text-orange-600 hover:underline">All →</a>
                       </div>
                       <div className="space-y-4">
-                        {mockActivityLogs.slice(0, 6).map(log => (
+                        {recentActivity.slice(0, 6).map((log: any) => (
                           <div key={log.id} className="flex items-start gap-2.5">
                             <Avatar name={log.userName} size="sm" />
                             <div className="flex-1 min-w-0">
@@ -576,7 +606,7 @@ export default function DashboardPage() {
                     </div>
                   );
                 case 'overdue_invoices':
-                  const hasOverdue = mockInvoices.some(i => i.status === 'overdue');
+                  const hasOverdue = overdueInvoices.length > 0;
                   if (!hasOverdue && !isEditing) return null;
                   return (
                     <div className={`card p-4 border-l-4 ${hasOverdue ? 'border-rose-500' : 'border-slate-300 bg-slate-50'} flex items-center justify-between`}>
@@ -584,7 +614,7 @@ export default function DashboardPage() {
                         <p className="text-sm font-semibold text-navy-900">{hasOverdue ? 'Overdue Invoices' : 'Overdue Invoices Alert'}</p>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {hasOverdue 
-                            ? `${mockInvoices.filter(i => i.status === 'overdue').length} invoice(s) are past their due date.`
+                            ? `${overdueInvoices.length} invoice(s) are past their due date.`
                             : 'No overdue invoices currently. This alert will show live when overdue invoices are present.'
                           }
                         </p>

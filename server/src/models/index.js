@@ -1,6 +1,12 @@
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs')
 
+// Enable virtuals globally so _id is mapped to id
+mongoose.plugin((schema) => {
+  schema.set('toJSON', { virtuals: true })
+  schema.set('toObject', { virtuals: true })
+})
+
 // ── User ──────────────────────────────────────────
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
@@ -37,6 +43,7 @@ const clientSchema = new mongoose.Schema({
   notes: String,
   status: { type: String, enum: ['active', 'inactive', 'lead'], default: 'lead' },
   portalUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  gstin: String,
   deletedAt: Date,
 }, { timestamps: true })
 

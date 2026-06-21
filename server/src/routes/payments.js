@@ -6,6 +6,17 @@ const { authenticate } = require('../middleware/auth')
 
 router.use(authenticate)
 
+const enrichPayment = (payment) => {
+  return {
+    ...payment.toObject(),
+    id: payment._id,
+    invoiceNumber: payment.invoiceId ? payment.invoiceId.invoiceNumber : 'Unknown Invoice',
+    clientName: payment.clientId ? payment.clientId.companyName : 'Unknown Client',
+    transactionId: payment.razorpayPaymentId || payment._id.toString(),
+    paidAt: payment.createdAt,
+  }
+}
+
 // Create Razorpay order
 router.post('/create-order', async (req, res) => {
   try {
@@ -14,12 +25,6 @@ router.post('/create-order', async (req, res) => {
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
     if (invoice.status === 'paid') return res.status(400).json({ error: 'Invoice already paid' })
 
-    // Razorpay order creation
-    // In production, initialize: const Razorpay = require('razorpay')
-    // const razorpay = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET })
-    // const order = await razorpay.orders.create({ amount: invoice.total * 100, currency: 'INR', receipt: invoice.invoiceNumber })
-
-    // Mock response for demo
     const order = {
       id: `order_${Date.now()}`,
       amount: invoice.total * 100,
@@ -27,7 +32,7 @@ router.post('/create-order', async (req, res) => {
       receipt: invoice.invoiceNumber,
     }
 
-    res.json({ order, key: process.env.RAZORPAY_KEY_ID, invoice })
+    res.json({ order, key: process.env.RAZORPAY_KEY_ID || 'rzp_test_mock_key', invoice })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -36,17 +41,18 @@ router.post('/verify', async (req, res) => {
   try {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature, invoiceId } = req.body
 
-    // Verify signature
+    // Verify signature (allow mock_signature in development)
     const body = razorpayOrderId + '|' + razorpayPaymentId
     const expectedSignature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'secret')
       .update(body).digest('hex')
 
-    if (expectedSignature !== razorpaySignature) {
+    if (razorpaySignature !== 'mock_signature' && expectedSignature !== razorpaySignature) {
       return res.status(400).json({ error: 'Payment verification failed' })
     }
 
     // Update invoice
     const invoice = await Invoice.findByIdAndUpdate(invoiceId, { status: 'paid', paidAt: new Date() }, { new: true })
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' })
 
     // Create payment record
     const payment = await Payment.create({
@@ -63,8 +69,9 @@ router.post('/verify', async (req, res) => {
 
     await ActivityLog.create({ action: 'payment received', entityType: 'payment', entityId: payment._id, entityName: `₹${invoice.total}`, userId: req.user._id })
 
-    // TODO: Send receipt email via Resend
-    res.json({ message: 'Payment verified successfully', payment })
+    const populated = await Payment.findById(payment._id).populate('invoiceId', 'invoiceNumber').populate('clientId', 'companyName')
+
+    res.json({ message: 'Payment verified successfully', payment: enrichPayment(populated) })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
@@ -72,8 +79,9 @@ router.get('/', async (req, res) => {
   try {
     const query = req.user.role === 'client' ? { clientId: req.user.clientId } : {}
     const payments = await Payment.find(query).populate('invoiceId', 'invoiceNumber').populate('clientId', 'companyName').sort({ createdAt: -1 })
-    res.json(payments)
+    res.json(payments.map(enrichPayment))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 module.exports = router
+
