@@ -9,10 +9,11 @@ const sample = {
     { name: 'Divya Menon', email: 'admin@zenithcreative.in', password: 'password', role: 'super_admin' },
     { name: 'Rahul Iyer', email: 'team@zenithcreative.in', password: 'password', role: 'team_member' },
     { name: 'Arjun Sharma', email: 'client@novatech.com', password: 'password', role: 'client' },
+    { name: 'Arjun Sharma (Viewer)', email: 'viewer@novatech.com', password: 'password', role: 'client_viewer' },
   ],
   clients: [
-    { companyName: 'Nova Tech Solutions', contactPerson: 'Arjun Sharma', email: 'arjun@novatech.com', phone: '+91 98765 43210', address: 'Bangalore, Karnataka', industry: 'Technology', notes: 'Long-term partner, prefers weekly updates', status: 'active' },
-    { companyName: 'Meridian Hospitality', contactPerson: 'Priya Nair', email: 'priya@meridian.in', phone: '+91 87654 32109', address: 'Mumbai, Maharashtra', industry: 'Hospitality', notes: 'High-end brand, premium deliverables', status: 'active' },
+    { companyName: 'Nova Tech Solutions', contactPerson: 'Arjun Sharma', email: 'arjun@novatech.com', phone: '+91 98765 43210', address: 'Bangalore, Karnataka', industry: 'Technology', notes: 'Long-term partner, prefers weekly updates', gstin: '29ABCDE1234F1Z5', status: 'active' },
+    { companyName: 'Meridian Hospitality', contactPerson: 'Priya Nair', email: 'priya@meridian.in', phone: '+91 87654 32109', address: 'Mumbai, Maharashtra', industry: 'Hospitality', notes: 'High-end brand, premium deliverables', gstin: '27GHIJK5678L2Z6', status: 'active' },
   ],
   projects: [
     { name: 'Brand Identity Redesign', description: 'Complete visual identity overhaul including logo, color system, typography, and brand guidelines document.', startDate: new Date('2024-04-01'), deadline: new Date('2024-07-15'), budget: 180000, status: 'active' },
@@ -23,8 +24,8 @@ const sample = {
     { title: 'Wireframes — Homepage', description: 'Low-fi wireframes for hero, features, pricing', dueDate: new Date('2024-05-20'), priority: 'critical', status: 'done' },
   ],
   invoices: [
-    { invoiceNumber: 'INV-2024-001', items: [{ description: 'Brand Strategy & Research', quantity: 1, rate: 45000, amount: 45000 }, { description: 'Logo Design (3 concepts)', quantity: 1, rate: 60000, amount: 60000 }, { description: 'Brand Guidelines Document', quantity: 1, rate: 40000, amount: 40000 }], subtotal: 145000, taxRate: 18, tax: 26100, total: 171100, status: 'paid', dueDate: new Date('2024-05-15'), paidAt: new Date('2024-05-12') },
-    { invoiceNumber: 'INV-2024-002', items: [{ description: 'Print Collateral Design', quantity: 1, rate: 80000, amount: 80000 }, { description: 'Digital Assets Package', quantity: 1, rate: 40000, amount: 40000 }], subtotal: 120000, taxRate: 18, tax: 21600, total: 141600, status: 'sent', dueDate: new Date('2024-06-25') },
+    { invoiceNumber: 'INV-2024-001', items: [{ description: 'Brand Strategy & Research', quantity: 1, rate: 45000, amount: 45000, hsnCode: '998311' }, { description: 'Logo Design (3 concepts)', quantity: 1, rate: 60000, amount: 60000, hsnCode: '998312' }, { description: 'Brand Guidelines Document', quantity: 1, rate: 40000, amount: 40000, hsnCode: '998313' }], subtotal: 145000, taxRate: 18, tax: 26100, total: 171100, status: 'paid', dueDate: new Date('2024-05-15'), paidAt: new Date('2024-05-12') },
+    { invoiceNumber: 'INV-2024-002', items: [{ description: 'Print Collateral Design', quantity: 1, rate: 80000, amount: 80000, hsnCode: '998314' }, { description: 'Digital Assets Package', quantity: 1, rate: 40000, amount: 40000, hsnCode: '998315' }], subtotal: 120000, taxRate: 18, tax: 21600, total: 141600, status: 'sent', dueDate: new Date('2024-06-25') },
   ],
   payments: [
     { amount: 171100, currency: 'INR', method: 'UPI', razorpayOrderId: 'order_1', razorpayPaymentId: 'pay_1', razorpaySignature: 'sig_1', status: 'success', receiptUrl: 'https://example.com/receipt/1' },
@@ -53,7 +54,7 @@ async function seed() {
 
   const createdClients = await Client.create(sample.clients)
   const clientUserData = sample.users.map(user => {
-    if (user.role === 'client') {
+    if (user.role === 'client' || user.role === 'client_viewer') {
       return { ...user, clientId: createdClients[0]._id }
     }
     return user

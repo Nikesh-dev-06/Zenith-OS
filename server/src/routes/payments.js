@@ -2,9 +2,10 @@ const express = require('express')
 const router = express.Router()
 const crypto = require('crypto')
 const { Payment, Invoice, ActivityLog, Notification } = require('../models')
-const { authenticate } = require('../middleware/auth')
+const { authenticate, readOnlyForViewer } = require('../middleware/auth')
 
 router.use(authenticate)
+router.use(readOnlyForViewer)
 
 const enrichPayment = (payment) => {
   return {
@@ -77,7 +78,7 @@ router.post('/verify', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    const query = req.user.role === 'client' ? { clientId: req.user.clientId } : {}
+    const query = ['client', 'client_viewer'].includes(req.user.role) ? { clientId: req.user.clientId } : {}
     const payments = await Payment.find(query).populate('invoiceId', 'invoiceNumber').populate('clientId', 'companyName').sort({ createdAt: -1 })
     res.json(payments.map(enrichPayment))
   } catch (err) { res.status(500).json({ error: err.message }) }

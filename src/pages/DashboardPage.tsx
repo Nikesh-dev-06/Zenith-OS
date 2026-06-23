@@ -5,10 +5,11 @@ import {
 } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Layout } from '../components/layout/Layout'
-import { StatCard, Avatar, ProjectStatusBadge, InvoiceStatusBadge } from '../components/ui/index'
+import { StatCard, Avatar, ProjectStatusBadge, InvoiceStatusBadge, Skeleton } from '../components/ui/index'
 import { Progress } from '../components/ui/index'
 import { formatCurrency, formatRelativeTime } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import api from '../lib/api'
 
 const pieData = [
@@ -109,9 +110,9 @@ function WidgetEditorWrapper({
         >
           <ArrowRight size={12} />
         </button>
-
+ 
         <div className="w-px h-3 bg-slate-700 mx-0.5" />
-
+ 
         {/* Width Selectors */}
         <button
           type="button"
@@ -137,9 +138,9 @@ function WidgetEditorWrapper({
         >
           Full
         </button>
-
+ 
         <div className="w-px h-3 bg-slate-700 mx-0.5" />
-
+ 
         {/* Show / Hide */}
         <button
           type="button"
@@ -150,7 +151,7 @@ function WidgetEditorWrapper({
           {visible ? <Eye size={12} /> : <EyeOff size={12} />}
         </button>
       </div>
-
+ 
       {!visible && (
         <div className="absolute inset-0 z-10 bg-slate-50/80 backdrop-blur-[1px] rounded-2xl flex flex-col items-center justify-center p-6 text-center select-none">
           <EyeOff className="text-slate-400 mb-1" size={20} />
@@ -164,14 +165,14 @@ function WidgetEditorWrapper({
           </button>
         </div>
       )}
-
+ 
       <div className={!visible ? 'pointer-events-none' : ''}>
         {children}
       </div>
     </div>
   )
 }
-
+ 
 // ── Stat Card Wrapper component with edit toolbar ───────────────────
 function StatCardEditorWrapper({
   label,
@@ -223,7 +224,7 @@ function StatCardEditorWrapper({
           {visible ? <Eye size={10} /> : <EyeOff size={10} />}
         </button>
       </div>
-
+ 
       {!visible && (
         <div className="absolute inset-0 z-10 bg-slate-50/90 rounded-2xl flex flex-col items-center justify-center p-3 text-center pointer-events-auto">
           <p className="text-[10px] font-bold text-slate-600 line-clamp-1">{label}</p>
@@ -236,21 +237,27 @@ function StatCardEditorWrapper({
           </button>
         </div>
       )}
-
+ 
       <div className={!visible ? 'pointer-events-none opacity-40' : ''}>
         {children}
       </div>
     </div>
   )
 }
-
+ 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [months, setMonths] = useState<number>(6)
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    return localStorage.getItem('zenith_onboarding_completed') !== 'true'
+  })
 
   useEffect(() => {
-    api.get('/dashboard')
+    setLoading(true)
+    api.get(`/dashboard?months=${months}`)
       .then(res => {
         setData(res.data)
         setLoading(false)
@@ -259,8 +266,8 @@ export default function DashboardPage() {
         console.error(err)
         setLoading(false)
       })
-  }, [])
-
+  }, [months])
+ 
   const stats = data || {
     totalClients: 0,
     activeProjects: 0,
@@ -276,9 +283,9 @@ export default function DashboardPage() {
   const activeProjectsList = data?.activeProjectsList || []
   const recentActivity = data?.recentActivity || []
   const overdueInvoices = data?.overdueInvoices || []
-
+ 
   const isAdmin = user?.role === 'super_admin'
-
+ 
   const [isEditing, setIsEditing] = useState(false)
   const [config, setConfig] = useState<DashboardConfig>(() => {
     const stored = localStorage.getItem('zenith_dashboard_layout')
@@ -292,22 +299,22 @@ export default function DashboardPage() {
     return DEFAULT_CONFIG
   })
   const [savedConfig, setSavedConfig] = useState<DashboardConfig>(config)
-
+ 
   const handleSave = () => {
     localStorage.setItem('zenith_dashboard_layout', JSON.stringify(config))
     setSavedConfig(config)
     setIsEditing(false)
   }
-
+ 
   const handleCancel = () => {
     setConfig(savedConfig)
     setIsEditing(false)
   }
-
+ 
   const handleReset = () => {
     setConfig(DEFAULT_CONFIG)
   }
-
+ 
   const moveWidget = (index: number, direction: number) => {
     const newIndex = index + direction
     if (newIndex < 0 || newIndex >= config.widgets.length) return
@@ -317,21 +324,21 @@ export default function DashboardPage() {
     newWidgets[newIndex] = temp
     setConfig(prev => ({ ...prev, widgets: newWidgets }))
   }
-
+ 
   const toggleWidgetVisible = (id: string) => {
     setConfig(prev => ({
       ...prev,
       widgets: prev.widgets.map(w => w.id === id ? { ...w, visible: !w.visible } : w)
     }))
   }
-
+ 
   const changeWidgetSpan = (id: string, span: string) => {
     setConfig(prev => ({
       ...prev,
       widgets: prev.widgets.map(w => w.id === id ? { ...w, span } : w)
     }))
   }
-
+ 
   const moveStat = (index: number, direction: number) => {
     const newIndex = index + direction
     if (newIndex < 0 || newIndex >= config.stats.length) return
@@ -341,12 +348,32 @@ export default function DashboardPage() {
     newStats[newIndex] = temp
     setConfig(prev => ({ ...prev, stats: newStats }))
   }
-
+ 
   const toggleStatVisible = (id: string) => {
     setConfig(prev => ({
       ...prev,
       stats: prev.stats.map(s => s.id === id ? { ...s, visible: !s.visible } : s)
     }))
+  }
+ 
+  if (loading && !isEditing) {
+    return (
+      <Layout title="Dashboard">
+        <div className="page-header">
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-28 w-full" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2"><Skeleton className="h-[290px] w-full" /></div>
+          <div><Skeleton className="h-[290px] w-full" /></div>
+          <div className="lg:col-span-2"><Skeleton className="h-[290px] w-full" /></div>
+          <div><Skeleton className="h-[290px] w-full" /></div>
+        </div>
+      </Layout>
+    )
   }
 
   return (
@@ -369,6 +396,48 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* Onboarding Checklist Widget */}
+      {showOnboarding && (
+        <div className="card p-6 mb-6 bg-slate-900 text-white relative overflow-hidden border-0">
+          <div className="absolute right-0 top-0 w-64 h-64 rounded-full bg-orange-600/10 blur-3xl pointer-events-none" />
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                🚀 Welcome to ZenithOS!
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">Get started by completing these quick steps to explore the platform.</p>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.setItem('zenith_onboarding_completed', 'true');
+                setShowOnboarding(false);
+              }}
+              className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { title: 'Add a Client', desc: 'Create your first CRM client entry.', link: '/clients' },
+              { title: 'Define a Project', desc: 'Assign work, team, and budget.', link: '/projects' },
+              { title: 'Issue an Invoice', desc: 'Bill client and set due dates.', link: '/invoices' },
+              { title: 'Check Client Portal', desc: 'Login as client@novatech.com.', link: '/portal' },
+            ].map((step, idx) => (
+              <a
+                key={idx}
+                href={step.link}
+                className="block p-3.5 rounded-xl bg-slate-800/50 hover:bg-slate-800 transition-colors border border-slate-700/50 hover:border-slate-600"
+              >
+                <p className="text-xs font-bold text-orange-500 mb-0.5">Step {idx + 1}</p>
+                <p className="text-xs font-semibold text-white">{step.title}</p>
+                <p className="text-[10px] text-slate-400 mt-1">{step.desc}</p>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+ 
       {/* Edit Mode Customizer Panel */}
       {isEditing && (
         <div className="mb-6 p-4 bg-orange-50/80 border border-orange-100 rounded-2xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 animate-slide-up">
@@ -404,7 +473,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
+ 
       {/* Grid Container for Layout Customization */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {config.widgets
@@ -417,7 +486,7 @@ export default function DashboardPage() {
                     <div className={getStatsGridClass(isEditing ? 5 : config.stats.filter(s => s.visible).length)}>
                       {config.stats.map((stat, statIndex) => {
                         if (!stat.visible && !isEditing) return null;
-
+ 
                         const statCardJsx = (() => {
                           switch (stat.id) {
                             case 'clients':
@@ -457,6 +526,7 @@ export default function DashboardPage() {
                                   value={formatCurrency(stats.outstandingPayments)}
                                   icon={<Clock size={18} className="text-amber-500" />}
                                   iconBg="bg-amber-50"
+                                  action={isAdmin ? <a href="/invoices?create=true" className="text-xs font-semibold text-orange-600 hover:underline flex items-center gap-1">➕ Create Invoice</a> : undefined}
                                 />
                               );
                             case 'pending':
@@ -472,7 +542,7 @@ export default function DashboardPage() {
                               return null;
                           }
                         })();
-
+ 
                         if (isEditing) {
                           return (
                             <StatCardEditorWrapper
@@ -488,7 +558,7 @@ export default function DashboardPage() {
                             </StatCardEditorWrapper>
                           );
                         }
-
+ 
                         return <div key={stat.id}>{statCardJsx}</div>;
                       })}
                     </div>
@@ -498,8 +568,19 @@ export default function DashboardPage() {
                     <div className="card p-6 h-full flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-6">
                         <div>
-                          <h2 className="section-title">Revenue Overview</h2>
-                          <p className="text-sm text-slate-500 mt-0.5">Billed vs. Collected — 2024</p>
+                          <div className="flex items-center gap-3">
+                            <h2 className="section-title">Revenue Overview</h2>
+                            <select
+                              value={months}
+                              onChange={(e) => setMonths(Number(e.target.value))}
+                              className="text-xs bg-slate-50 border border-slate-200 rounded p-1 font-semibold text-slate-700 outline-none cursor-pointer focus:ring-1 focus:ring-orange-500/20"
+                            >
+                              <option value={3}>3 Months</option>
+                              <option value={6}>6 Months</option>
+                              <option value={12}>12 Months</option>
+                            </select>
+                          </div>
+                          <p className="text-sm text-slate-500 mt-0.5">Billed vs. Collected</p>
                         </div>
                         <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
                           <span className="flex items-center gap-1.5"><span className="w-3 h-1 rounded-full inline-block" style={{ background: '#F4511E' }} /> Billed</span>
@@ -609,21 +690,46 @@ export default function DashboardPage() {
                   const hasOverdue = overdueInvoices.length > 0;
                   if (!hasOverdue && !isEditing) return null;
                   return (
-                    <div className={`card p-4 border-l-4 ${hasOverdue ? 'border-rose-500' : 'border-slate-300 bg-slate-50'} flex items-center justify-between`}>
-                      <div>
-                        <p className="text-sm font-semibold text-navy-900">{hasOverdue ? 'Overdue Invoices' : 'Overdue Invoices Alert'}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {hasOverdue 
-                            ? `${overdueInvoices.length} invoice(s) are past their due date.`
-                            : 'No overdue invoices currently. This alert will show live when overdue invoices are present.'
-                          }
-                        </p>
+                    <div className={`card p-5 border-l-4 ${hasOverdue ? 'border-rose-500' : 'border-slate-300 bg-slate-50'} space-y-4`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-navy-900">{hasOverdue ? '🚨 Overdue Invoices' : 'Overdue Invoices Alert'}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {hasOverdue 
+                              ? `${overdueInvoices.length} invoice(s) are past their due date.`
+                              : 'No overdue invoices currently.'
+                            }
+                          </p>
+                        </div>
+                        {hasOverdue && (
+                          <a href="/invoices" className="text-xs font-semibold text-orange-600 hover:underline">View all</a>
+                        )}
                       </div>
                       {hasOverdue && (
-                        <a href="/invoices" className="btn-secondary text-xs py-2">
-                          <InvoiceStatusBadge status="overdue" />
-                          View
-                        </a>
+                        <div className="space-y-2.5 max-h-40 overflow-y-auto">
+                          {overdueInvoices.map((inv: any) => (
+                            <div key={inv.id} className="flex items-center justify-between border-t border-slate-100 pt-2.5">
+                              <div>
+                                <p className="text-xs font-semibold text-navy-900">{inv.invoiceNumber} &middot; {inv.clientName}</p>
+                                <p className="text-[10px] text-slate-400">Due {new Date(inv.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-rose-600">{formatCurrency(inv.total)}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    api.post(`/invoices/${inv.id}/send`)
+                                      .then(() => toast.success('Reminder email sent!'))
+                                      .catch(err => toast.error(err.response?.data?.error || err.message));
+                                  }}
+                                  className="btn-secondary text-[10px] py-1 px-2.5 cursor-pointer"
+                                >
+                                  Send Reminder
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   );
@@ -631,7 +737,7 @@ export default function DashboardPage() {
                   return null;
               }
             })();
-
+ 
             if (isEditing) {
               return (
                 <WidgetEditorWrapper
@@ -649,7 +755,7 @@ export default function DashboardPage() {
                 </WidgetEditorWrapper>
               );
             }
-
+ 
             return (
               <div key={widget.id} className={widget.span}>
                 {widgetContent}

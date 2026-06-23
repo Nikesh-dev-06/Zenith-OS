@@ -1,9 +1,10 @@
 const express = require('express')
 const { Project, ActivityLog, Client, Task } = require('../models')
-const { authenticate, agencyOnly } = require('../middleware/auth')
+const { authenticate, agencyOnly, readOnlyForViewer } = require('../middleware/auth')
 const router = express.Router()
 
 router.use(authenticate)
+router.use(readOnlyForViewer)
 
 const enrichProject = async (proj) => {
   const [client, taskCount, completedTasks] = await Promise.all([
@@ -28,7 +29,7 @@ router.get('/', async (req, res) => {
     const query = { deletedAt: null }
     if (clientId) query.clientId = clientId
     if (status && status !== 'all') query.status = status
-    if (req.user.role === 'client') query.clientId = req.user.clientId
+    if (['client', 'client_viewer'].includes(req.user.role)) query.clientId = req.user.clientId
 
     const [projects, total] = await Promise.all([
       Project.find(query).populate('clientId', 'companyName').populate('teamMembers', 'name email').skip((page - 1) * limit).limit(+limit).sort({ createdAt: -1 }),
@@ -52,7 +53,7 @@ router.get('/:id', async (req, res) => {
   try {
     const project = await Project.findById(req.params.id).populate('clientId', 'companyName email').populate('teamMembers', 'name email avatar')
     if (!project) return res.status(404).json({ error: 'Project not found' })
-    if (req.user.role === 'client' && project.clientId._id.toString() !== req.user.clientId?.toString()) {
+    if (['client', 'client_viewer'].includes(req.user.role) && project.clientId._id.toString() !== req.user.clientId?.toString()) {
       return res.status(403).json({ error: 'Access denied' })
     }
     const enriched = await enrichProject(project)

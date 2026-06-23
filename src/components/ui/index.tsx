@@ -12,12 +12,12 @@ interface BadgeProps {
 
 export function Badge({ children, variant = 'default', size = 'md' }: BadgeProps) {
   const variants = {
-    success: 'bg-emerald-50 text-emerald-700',
-    warning: 'bg-amber-50 text-amber-700',
-    danger: 'bg-rose-50 text-rose-700',
-    info: 'bg-blue-50 text-blue-700',
-    default: 'bg-slate-100 text-slate-600',
-    purple: 'bg-purple-50 text-purple-700',
+    success: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+    warning: 'bg-amber-100 text-amber-800 border border-amber-200',
+    danger: 'bg-rose-100 text-rose-800 border border-rose-200',
+    info: 'bg-blue-100 text-blue-800 border border-blue-200',
+    default: 'bg-slate-200 text-slate-800 border border-slate-300',
+    purple: 'bg-purple-100 text-purple-800 border border-purple-200',
     brand: 'text-white',
   }
   const sizes = { sm: 'px-2 py-0.5 text-xs', md: 'px-2.5 py-1 text-xs' }
@@ -206,23 +206,81 @@ interface StatCardProps {
   change?: number
   icon: ReactNode
   iconBg?: string
+  action?: ReactNode
 }
 
-export function StatCard({ label, value, change, icon, iconBg = 'bg-orange-50' }: StatCardProps) {
+export function StatCard({ label, value, change, icon, iconBg = 'bg-orange-50', action }: StatCardProps) {
   return (
-    <div className="card p-6">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-medium text-slate-500">{label}</span>
-        <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center`}>
-          {icon}
+    <div className="card p-6 flex flex-col justify-between h-full">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm font-medium text-slate-500">{label}</span>
+          <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center`}>
+            {icon}
+          </div>
+        </div>
+        <p className="text-2xl font-bold text-navy-900 mb-1">{value}</p>
+        {change !== undefined && (
+          <p className={`text-xs font-medium ${change >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% this month
+          </p>
+        )}
+      </div>
+      {action && <div className="mt-3 pt-2.5 border-t border-slate-100">{action}</div>}
+    </div>
+  )
+}
+
+// ── Confirmation Modal ──────────────────────────────────────────────
+interface ConfirmationModalProps {
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  title: string
+  message: string
+  confirmText?: string
+  cancelText?: string
+  variant?: 'danger' | 'warning' | 'info'
+}
+
+export function ConfirmationModal({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  variant = 'danger'
+}: ConfirmationModalProps) {
+  if (!open) return null
+
+  const variantColors = {
+    danger: 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-500/25',
+    warning: 'bg-amber-500 hover:bg-amber-600 focus:ring-amber-500/25',
+    info: 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500/25',
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-slide-up p-6"
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 className="font-bold text-lg text-navy-900 mb-2">{title}</h3>
+        <p className="text-slate-500 text-sm mb-6">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="btn-secondary flex-1 py-2 justify-center cursor-pointer">
+            {cancelText}
+          </button>
+          <button
+            onClick={() => { onConfirm(); onClose(); }}
+            className={`inline-flex items-center justify-center flex-1 py-2 rounded-xl font-semibold text-sm text-white transition-all duration-200 shadow-md active:scale-95 cursor-pointer ${variantColors[variant]}`}
+          >
+            {confirmText}
+          </button>
         </div>
       </div>
-      <p className="text-2xl font-bold text-navy-900 mb-1">{value}</p>
-      {change !== undefined && (
-        <p className={`text-xs font-medium ${change >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% this month
-        </p>
-      )}
     </div>
   )
 }

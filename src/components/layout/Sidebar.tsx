@@ -3,13 +3,14 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, FolderOpen, CheckSquare, FileText,
   ShieldCheck, Receipt, CreditCard, Bell, BarChart3, ClipboardList,
-  Settings, LogOut, Menu, X, ChevronRight
+  Settings, LogOut, Menu, X, ChevronRight, PenTool
 } from 'lucide-react'
 import { Logo } from '../ui/Logo'
 import { Avatar } from '../ui/index'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
 import { useEffect } from 'react'
+import { useLanguage } from '../../context/LanguageContext'
 
 const agencyNav = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
@@ -18,6 +19,8 @@ const agencyNav = [
   { label: 'Tasks', icon: CheckSquare, to: '/tasks' },
   { label: 'Files', icon: FileText, to: '/files' },
   { label: 'Approvals', icon: ShieldCheck, to: '/approvals' },
+  { label: 'Proposals', icon: FileText, to: '/proposals' },
+  { label: 'Contracts', icon: PenTool, to: '/contracts' },
   { label: 'Invoices', icon: Receipt, to: '/invoices' },
   { label: 'Payments', icon: CreditCard, to: '/payments' },
   { label: 'Reports', icon: BarChart3, to: '/reports' },
@@ -29,6 +32,8 @@ const clientNav = [
   { label: 'My Projects', icon: FolderOpen, to: '/portal/projects' },
   { label: 'My Files', icon: FileText, to: '/portal/files' },
   { label: 'Approvals', icon: ShieldCheck, to: '/portal/approvals' },
+  { label: 'Proposals', icon: FileText, to: '/portal/proposals' },
+  { label: 'Contracts', icon: PenTool, to: '/portal/contracts' },
   { label: 'Invoices', icon: Receipt, to: '/portal/invoices' },
 ]
 
@@ -38,6 +43,17 @@ export function Sidebar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [unread, setUnread] = useState(0)
+  const { t } = useLanguage()
+
+  const [brandName, setBrandName] = useState('ZenithOS')
+  const [brandLogo, setBrandLogo] = useState('/favicon.png')
+
+  useEffect(() => {
+    const savedName = localStorage.getItem('zenithos_brand_name')
+    const savedLogo = localStorage.getItem('zenithos_brand_logo')
+    if (savedName) setBrandName(savedName)
+    if (savedLogo) setBrandLogo(savedLogo)
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -49,11 +65,34 @@ export function Sidebar() {
       .catch(err => console.error(err))
   }, [user])
 
-  const nav = user?.role === 'client' ? clientNav : agencyNav
+  const isClientRole = ['client', 'client_viewer'].includes(user?.role || '')
+  const nav = isClientRole ? clientNav : agencyNav
 
   const handleLogout = () => {
     logout()
     navigate('/login')
+  }
+
+  const getNavLabel = (label: string) => {
+    const keyMap: Record<string, string> = {
+      'Dashboard': 'dashboard',
+      'Clients': 'clients',
+      'Projects': 'projects',
+      'Tasks': 'tasks',
+      'Files': 'files',
+      'Approvals': 'approvals',
+      'Invoices': 'invoices',
+      'Payments': 'payments',
+      'Reports': 'reports',
+      'Activity Log': 'recentActivity',
+      'Proposals': 'proposals',
+      'Contracts': 'contracts',
+      'My Portal': 'dashboard',
+      'My Projects': 'projects',
+      'My Files': 'files',
+    }
+    const key = keyMap[label]
+    return key ? t(key) : label
   }
 
   return (
@@ -80,11 +119,21 @@ export function Sidebar() {
       `}>
         {/* Header */}
         <div className={`flex items-center border-b border-slate-100 ${collapsed ? 'px-3 py-4 justify-center' : 'px-5 py-4 justify-between'}`}>
-          <img
-  src={collapsed ? "/favicon.png" : "/favicon.png"}
-  alt="Logo"
-  className={`${collapsed ? 'h-8' : 'h-10'} w-auto`}
-/>
+          <div className="flex items-center gap-2 min-w-0">
+            <img
+              src={brandLogo}
+              alt="Logo"
+              className="h-8 w-auto object-contain flex-shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/favicon.png'
+              }}
+            />
+            {!collapsed && (
+              <span className="font-extrabold text-navy-900 text-sm truncate uppercase tracking-wider">
+                {brandName}
+              </span>
+            )}
+          </div>
           <button
             className="hidden lg:flex btn-ghost p-1.5 text-slate-400"
             onClick={() => setCollapsed(!collapsed)}
@@ -97,7 +146,7 @@ export function Sidebar() {
         <nav className="flex-1 px-2.5 py-4 overflow-y-auto space-y-0.5">
           {!collapsed && (
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">
-              {user?.role === 'client' ? 'My Space' : 'Operations'}
+              {isClientRole ? 'My Space' : 'Operations'}
             </p>
           )}
           {nav.map(item => (
@@ -118,7 +167,7 @@ export function Sidebar() {
               {({ isActive }) => (
                 <>
                   <item.icon size={17} className={isActive ? 'text-orange-600' : 'text-slate-500'} />
-                  {!collapsed && <span>{item.label}</span>}
+                  {!collapsed && <span>{getNavLabel(item.label)}</span>}
                   {!collapsed && item.label === 'Approvals' && unread > 0 && (
                     <span className="ml-auto w-5 h-5 rounded-full text-white text-xs flex items-center justify-center font-bold"
                       style={{ background: 'linear-gradient(135deg,#F4511E,#FF8C42)' }}>
@@ -130,7 +179,7 @@ export function Sidebar() {
             </NavLink>
           ))}
 
-          {!collapsed && user?.role !== 'client' && (
+          {!collapsed && !isClientRole && (
             <>
               <div className="border-t border-slate-100 my-3" />
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">System</p>
@@ -142,7 +191,7 @@ export function Sidebar() {
                 }
               >
                 <Settings size={17} className="text-slate-500" />
-                <span>Settings</span>
+                <span>{t('settings')}</span>
               </NavLink>
               <NavLink
                 to="/notifications"
@@ -152,7 +201,7 @@ export function Sidebar() {
                 }
               >
                 <Bell size={17} className="text-slate-500" />
-                <span>Notifications</span>
+                <span>{t('notifications')}</span>
                 {unread > 0 && (
                   <span className="ml-auto w-5 h-5 rounded-full text-white text-xs flex items-center justify-center font-bold"
                     style={{ background: 'linear-gradient(135deg,#F4511E,#FF8C42)' }}>

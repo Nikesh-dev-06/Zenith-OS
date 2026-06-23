@@ -64,11 +64,11 @@
     @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
 
-  .badge-success { @apply badge bg-emerald-50 text-emerald-700; }
-  .badge-warning { @apply badge bg-amber-50 text-amber-700; }
-  .badge-danger  { @apply badge bg-rose-50 text-rose-700; }
-  .badge-info    { @apply badge bg-blue-50 text-blue-700; }
-  .badge-default { @apply badge bg-slate-100 text-slate-600; }
+  .badge-success { @apply badge bg-emerald-100 text-emerald-800 border border-emerald-200; }
+  .badge-warning { @apply badge bg-amber-100 text-amber-800 border border-amber-200; }
+  .badge-danger  { @apply badge bg-rose-100 text-rose-800 border border-rose-200; }
+  .badge-info    { @apply badge bg-blue-100 text-blue-800 border border-blue-200; }
+  .badge-default { @apply badge bg-slate-200 text-slate-800 border border-slate-300; }
   .badge-brand   { @apply badge text-white; background: linear-gradient(135deg, #F4511E, #FF8C42); }
 
   .sidebar-item {
@@ -173,4 +173,105 @@
 .avatar {
   @apply rounded-full flex items-center justify-center text-white font-semibold text-sm;
   background: linear-gradient(135deg, #F4511E, #FF8C42);
+}
+
+/* ── Premium Dark Mode Overrides ────────────────────────────────────── */
+.dark body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+.dark .bg-background {
+  @apply bg-slate-950;
+}
+
+.dark .card {
+  @apply bg-slate-900 border-slate-800 shadow-none text-slate-100;
+}
+
+.dark .bg-white {
+  @apply bg-slate-900;
+}
+
+.dark .text-navy-900 {
+  @apply text-slate-100;
+}
+
+.dark .text-slate-500 {
+  @apply text-slate-400;
+}
+
+.dark .text-slate-600 {
+  @apply text-slate-300;
+}
+
+.dark .text-slate-700 {
+  @apply text-slate-200;
+}
+
+.dark .text-slate-800 {
+  @apply text-slate-100;
+}
+
+.dark .bg-slate-50 {
+  @apply bg-slate-800/40;
+}
+
+.dark .bg-slate-100 {
+  @apply bg-slate-800;
+}
+
+.dark .border-slate-100 {
+  @apply border-slate-800/80;
+}
+
+.dark .border-slate-200 {
+  @apply border-slate-800;
+}
+
+.dark .input {
+  @apply bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-500;
+}
+
+.dark select.input option {
+  @apply bg-slate-900 text-slate-100;
+}
+
+.dark .sidebar-item {
+  @apply text-slate-400 hover:bg-slate-800/50 hover:text-white;
+}
+
+.dark .sidebar-item.active {
+  @apply bg-orange-950/20 text-orange-500;
+}
+
+.dark aside {
+  @apply bg-slate-900 border-slate-800/80;
+}
+
+.dark .table-row {
+  @apply border-b border-slate-800/50 hover:bg-slate-800/30;
+}
+
+.dark .table-header {
+  @apply text-slate-400 bg-slate-900;
+}
+
+.dark .table-cell {
+  @apply text-slate-300;
+}
+
+.dark .divider {
+  @apply border-slate-800/80;
+}
+
+.dark .modal {
+  @apply bg-slate-900 border border-slate-800 text-slate-100;
+}
+
+.dark .btn-secondary {
+  @apply bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-white;
+}
+
+.dark .btn-ghost {
+  @apply text-slate-400 hover:bg-slate-800 hover:text-slate-100;
 }

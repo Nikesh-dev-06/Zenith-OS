@@ -1,9 +1,10 @@
 // tasks.js
 const express = require('express')
 const { Task, ActivityLog, Project } = require('../models')
-const { authenticate, agencyOnly } = require('../middleware/auth')
+const { authenticate, agencyOnly, readOnlyForViewer } = require('../middleware/auth')
 const router = express.Router()
 router.use(authenticate)
+router.use(readOnlyForViewer)
 
 const enrichTask = (task) => {
   return {
@@ -67,6 +68,90 @@ router.delete('/:id', agencyOnly, async (req, res) => {
     const task = await Task.findByIdAndUpdate(req.params.id, { deletedAt: new Date() })
     if (!task) return res.status(404).json({ error: 'Task not found' })
     res.json({ message: 'Task deleted' })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /:id/timer/start
+router.post('/:id/timer/start', agencyOnly, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id)
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+    if (task.isTimerRunning) return res.status(400).json({ error: 'Timer is already running' })
+
+    task.isTimerRunning = true
+    task.timerStartedAt = new Date()
+    await task.save()
+
+    res.json(enrichTask(task))
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /:id/timer/stop
+router.post('/:id/timer/stop', agencyOnly, async (req, res) => {
+  try {
+    const { description } = req.body
+    const task = await Task.findById(req.params.id)
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+    if (!task.isTimerRunning || !task.timerStartedAt) {
+      return res.status(400).json({ error: 'Timer is not running' })
+    }
+
+    const elapsedMs = new Date() - new Date(task.timerStartedAt)
+    const durationMinutes = Math.max(1, Math.round(elapsedMs / 1000 / 60))
+
+    task.isTimerRunning = false
+    task.totalLoggedTime = (task.totalLoggedTime || 0) + durationMinutes
+    task.timeLogs.push({
+      userId: req.user._id,
+      userName: req.user.name,
+      durationMinutes,
+      description: description || 'Timer task tracking session',
+      createdAt: new Date()
+    })
+    await task.save()
+
+    await ActivityLog.create({
+      action: 'logged task time',
+      entityType: 'task',
+      entityId: task._id,
+      entityName: `${task.title} (${durationMinutes}m)`,
+      userId: req.user._id
+    })
+
+    res.json(enrichTask(task))
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// POST /:id/time-log
+router.post('/:id/time-log', agencyOnly, async (req, res) => {
+  try {
+    const { durationMinutes, description } = req.body
+    if (!durationMinutes || durationMinutes <= 0) {
+      return res.status(400).json({ error: 'Valid duration is required' })
+    }
+
+    const task = await Task.findById(req.params.id)
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+
+    task.totalLoggedTime = (task.totalLoggedTime || 0) + Number(durationMinutes)
+    task.timeLogs.push({
+      userId: req.user._id,
+      userName: req.user.name,
+      durationMinutes: Number(durationMinutes),
+      description: description || 'Manual time entry',
+      createdAt: new Date()
+    })
+    await task.save()
+
+    await ActivityLog.create({
+      action: 'logged task time',
+      entityType: 'task',
+      entityId: task._id,
+      entityName: `${task.title} (${durationMinutes}m)`,
+      userId: req.user._id
+    })
+
+    res.json(enrichTask(task))
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

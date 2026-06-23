@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true, minlength: 8, select: false },
-  role: { type: String, enum: ['super_admin', 'team_member', 'client'], default: 'team_member' },
+  role: { type: String, enum: ['super_admin', 'team_member', 'client', 'client_viewer'], default: 'team_member' },
   clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' }, // Only for client role
   avatar: String,
   isActive: { type: Boolean, default: true },
@@ -55,6 +55,9 @@ const clientSchema = new mongoose.Schema({
   status: { type: String, enum: ['active', 'inactive', 'lead'], default: 'lead' },
   portalUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   gstin: String,
+  pan: String,
+  tags: [String],
+  customFields: [{ label: String, value: String }],
   deletedAt: Date,
 }, { timestamps: true })
 
@@ -71,6 +74,10 @@ const projectSchema = new mongoose.Schema({
   budget: { type: Number, default: 0 },
   status: { type: String, enum: ['draft', 'active', 'review', 'completed', 'archived'], default: 'draft' },
   teamMembers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  defaultTaxRate: { type: Number, default: 18 },
+  defaultDiscountRate: { type: Number, default: 0 },
+  tags: [String],
+  customFields: [{ label: String, value: String }],
   deletedAt: Date,
 }, { timestamps: true })
 
@@ -86,6 +93,16 @@ const taskSchema = new mongoose.Schema({
   dueDate: Date,
   priority: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
   status: { type: String, enum: ['pending', 'in_progress', 'review', 'done'], default: 'pending' },
+  timeLogs: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    userName: String,
+    durationMinutes: Number,
+    description: String,
+    createdAt: { type: Date, default: Date.now }
+  }],
+  isTimerRunning: { type: Boolean, default: false },
+  timerStartedAt: Date,
+  totalLoggedTime: { type: Number, default: 0 }, // in minutes
   order: { type: Number, default: 0 },
   deletedAt: Date,
 }, { timestamps: true })
@@ -106,6 +123,7 @@ const fileSchema = new mongoose.Schema({
   version: { type: Number, default: 1 },
   downloadCount: { type: Number, default: 0 },
   isClientVisible: { type: Boolean, default: true },
+  description: String,
   deletedAt: Date,
 }, { timestamps: true })
 
@@ -122,6 +140,9 @@ const approvalSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending_review', 'approved', 'revision_requested'], default: 'pending_review' },
   clientComment: String,
   respondedAt: Date,
+  signatureText: String,
+  signatureDrawn: String, // Drawn path representation or initials
+  signedAt: Date,
 }, { timestamps: true })
 
 approvalSchema.index({ projectId: 1, status: 1 })
@@ -133,6 +154,7 @@ const invoiceItemSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, min: 1 },
   rate: { type: Number, required: true, min: 0 },
   amount: { type: Number, required: true },
+  hsnCode: String,
 }, { _id: false })
 
 const invoiceSchema = new mongoose.Schema({
@@ -141,6 +163,9 @@ const invoiceSchema = new mongoose.Schema({
   projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
   items: [invoiceItemSchema],
   subtotal: { type: Number, required: true },
+  discountType: { type: String, enum: ['percent', 'flat'], default: 'percent' },
+  discountValue: { type: Number, default: 0 },
+  discount: { type: Number, default: 0 },
   taxRate: { type: Number, default: 18 },
   tax: { type: Number, required: true },
   total: { type: Number, required: true },
@@ -149,6 +174,26 @@ const invoiceSchema = new mongoose.Schema({
   paidAt: Date,
   pdfUrl: String,
   notes: String,
+  currency: { type: String, default: 'INR' },
+  taxType: { type: String, enum: ['GST', 'VAT', 'None'], default: 'GST' },
+  placeOfSupply: { type: String, default: 'Delhi' },
+  isIntrastate: { type: Boolean, default: true },
+  cgst: { type: Number, default: 0 },
+  sgst: { type: Number, default: 0 },
+  igst: { type: Number, default: 0 },
+  rcm: { type: Boolean, default: false },
+  tdsRate: { type: Number, default: 0 },
+  tdsAmount: { type: Number, default: 0 },
+  isExport: { type: Boolean, default: false },
+  lutNumber: String,
+  roundingAdjustment: { type: Number, default: 0 },
+  bankDetails: {
+    bankName: { type: String, default: 'HDFC Bank' },
+    accountNumber: { type: String, default: '50100234567890' },
+    ifscCode: { type: String, default: 'HDFC0000123' },
+    accountHolder: { type: String, default: 'Zenith OS Agency' },
+    upiId: { type: String, default: 'zenithos@upi' }
+  },
 }, { timestamps: true })
 
 invoiceSchema.index({ clientId: 1, status: 1 })
@@ -200,6 +245,86 @@ const activityLogSchema = new mongoose.Schema({
 activityLogSchema.index({ userId: 1, createdAt: -1 })
 activityLogSchema.index({ entityType: 1, entityId: 1 })
 
+// ── Interaction ──────────────────────────────────────
+const interactionSchema = new mongoose.Schema({
+  clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
+  type: { type: String, enum: ['call', 'email', 'note', 'system'], default: 'note' },
+  content: { type: String, required: true },
+  recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  recordedByName: String,
+  createdAt: { type: Date, default: Date.now }
+})
+
+// ── Webhook Subscription ──────────────────────────────
+const webhookSubscriptionSchema = new mongoose.Schema({
+  url: { type: String, required: true },
+  event: { type: String, enum: ['invoice.created', 'project.completed', 'approval.submitted'], required: true },
+  isActive: { type: Boolean, default: true }
+}, { timestamps: true })
+
+// ── Webhook Log ───────────────────────────────────────
+const webhookLogSchema = new mongoose.Schema({
+  subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'WebhookSubscription' },
+  url: { type: String, required: true },
+  event: String,
+  payload: mongoose.Schema.Types.Mixed,
+  responseStatus: Number,
+  responseBody: String
+}, { timestamps: true })
+
+// ── Recurring Invoice Template ───────────────────────
+const recurringInvoiceTemplateSchema = new mongoose.Schema({
+  clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
+  projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
+  items: [invoiceItemSchema],
+  subtotal: { type: Number, required: true },
+  discountType: { type: String, enum: ['percent', 'flat'], default: 'percent' },
+  discountValue: { type: Number, default: 0 },
+  discount: { type: Number, default: 0 },
+  taxRate: { type: Number, default: 18 },
+  tax: { type: Number, required: true },
+  total: { type: Number, required: true },
+}, { timestamps: true })
+
+// ── Proposal ───────────────────────────────────────
+const proposalSchema = new mongoose.Schema({
+  proposalNumber: { type: String, required: true, unique: true },
+  clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
+  projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
+  title: { type: String, required: true },
+  items: [invoiceItemSchema],
+  subtotal: { type: Number, required: true },
+  discountType: { type: String, enum: ['percent', 'flat'], default: 'percent' },
+  discountValue: { type: Number, default: 0 },
+  discount: { type: Number, default: 0 },
+  taxRate: { type: Number, default: 18 },
+  tax: { type: Number, required: true },
+  total: { type: Number, required: true },
+  currency: { type: String, default: 'USD' },
+  status: { type: String, enum: ['draft', 'sent', 'accepted', 'rejected'], default: 'draft' },
+  validUntil: { type: Date, required: true },
+  notes: String,
+  signatureText: String,
+  signedAt: Date,
+}, { timestamps: true })
+
+// ── Contract ───────────────────────────────────────
+const contractSchema = new mongoose.Schema({
+  contractNumber: { type: String, required: true, unique: true },
+  clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
+  projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
+  title: { type: String, required: true },
+  content: { type: String, required: true }, // Contract/SOW text
+  status: { type: String, enum: ['draft', 'sent', 'signed', 'terminated'], default: 'draft' },
+  signatureText: String,
+  signatureDrawn: String,
+  signedAt: Date,
+  signerName: String,
+  validFrom: Date,
+  validTo: Date,
+  notes: String,
+}, { timestamps: true })
+
 module.exports = {
   User: mongoose.model('User', userSchema),
   Client: mongoose.model('Client', clientSchema),
@@ -211,4 +336,10 @@ module.exports = {
   Payment: mongoose.model('Payment', paymentSchema),
   Notification: mongoose.model('Notification', notificationSchema),
   ActivityLog: mongoose.model('ActivityLog', activityLogSchema),
+  Interaction: mongoose.model('Interaction', interactionSchema),
+  WebhookSubscription: mongoose.model('WebhookSubscription', webhookSubscriptionSchema),
+  WebhookLog: mongoose.model('WebhookLog', webhookLogSchema),
+  RecurringInvoiceTemplate: mongoose.model('RecurringInvoiceTemplate', recurringInvoiceTemplateSchema),
+  Proposal: mongoose.model('Proposal', proposalSchema),
+  Contract: mongoose.model('Contract', contractSchema),
 }

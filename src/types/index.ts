@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'team_member' | 'client'
+export type UserRole = 'super_admin' | 'team_member' | 'client' | 'client_viewer'
 
 export interface User {
   id: string
@@ -6,6 +6,7 @@ export interface User {
   email: string
   role: UserRole
   avatar?: string
+  clientId?: string
   createdAt: string
 }
 
@@ -26,6 +27,9 @@ export interface Client {
   createdAt: string
   updatedAt: string
   gstin?: string
+  pan?: string
+  tags?: string[]
+  customFields?: { label: string; value: string }[]
 }
 
 export type ProjectStatus = 'draft' | 'active' | 'review' | 'completed' | 'archived'
@@ -46,6 +50,8 @@ export interface Project {
   completedTasks: number
   createdAt: string
   updatedAt: string
+  tags?: string[]
+  customFields?: { label: string; value: string }[]
 }
 
 export type TaskStatus = 'pending' | 'in_progress' | 'review' | 'done'
@@ -102,23 +108,46 @@ export interface InvoiceItem {
   quantity: number
   rate: number
   amount: number
+  hsnCode?: string
 }
 
 export interface Invoice {
   id: string
   invoiceNumber: string
-  clientId: string
+  clientId: string | any
   clientName: string
   projectId: string
   projectName: string
   items: InvoiceItem[]
   subtotal: number
+  taxRate?: number
   tax: number
   total: number
   status: InvoiceStatus
   dueDate: string
   paidAt?: string
   createdAt: string
+  placeOfSupply?: string
+  isIntrastate?: boolean
+  cgst?: number
+  sgst?: number
+  igst?: number
+  rcm?: boolean
+  tdsRate?: number
+  tdsAmount?: number
+  isExport?: boolean
+  lutNumber?: string
+  roundingAdjustment?: number
+  discountType?: 'percent' | 'flat'
+  discountValue?: number
+  discount?: number
+  bankDetails?: {
+    bankName: string
+    accountNumber: string
+    ifscCode: string
+    accountHolder: string
+    upiId: string
+  }
 }
 
 export interface Payment {

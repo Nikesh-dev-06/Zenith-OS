@@ -13,6 +13,16 @@ export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
+  const [brandLogo, setBrandLogo] = useState('/favicon.png')
+  const [brandName, setBrandName] = useState('ZenithOS')
+
+  useState(() => {
+    const savedLogo = localStorage.getItem('zenithos_brand_logo')
+    const savedName = localStorage.getItem('zenithos_brand_name')
+    if (savedLogo) setBrandLogo(savedLogo)
+    if (savedName) setBrandName(savedName)
+  })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -31,17 +41,18 @@ export default function LoginPage() {
     }
   }
 
-  const demoLogin = async (role: 'super_admin' | 'team_member' | 'client') => {
+  const demoLogin = async (role: 'super_admin' | 'team_member' | 'client' | 'client_viewer') => {
     setLoading(true)
     try {
       const defaultCredentials = {
         super_admin: { email: 'admin@zenithcreative.in', password: 'password' },
         team_member: { email: 'team@zenithcreative.in', password: 'password' },
         client: { email: 'client@novatech.com', password: 'password' },
+        client_viewer: { email: 'viewer@novatech.com', password: 'password' },
       }
       const creds = defaultCredentials[role]
       await login(creds.email, creds.password)
-      navigate(role === 'client' ? '/portal' : '/dashboard')
+      navigate(['client', 'client_viewer'].includes(role) ? '/portal' : '/dashboard')
     } catch (err: any) {
       if (!err?.response) {
         setError('Network/CORS error: Cannot reach the backend server. Please verify that the backend is running.')
@@ -68,9 +79,12 @@ export default function LoginPage() {
 
           <div className="flex justify-start">
   <img
-    src="/favicon.png"
+    src={brandLogo}
     alt="Company Logo"
-    className="h-16 w-auto relative z-10"
+    className="h-16 w-auto relative z-10 object-contain"
+    onError={(e) => {
+      (e.target as HTMLImageElement).src = '/favicon.png'
+    }}
   />
 </div>
 
@@ -83,7 +97,7 @@ export default function LoginPage() {
             Every Project.
           </h2>
           <p className="text-slate-400 text-base leading-relaxed max-w-xs">
-            The complete operations system built specifically for Zenith Creative.
+            The complete operations system built specifically for {brandName}.
           </p>
         </div>
 
@@ -108,16 +122,19 @@ export default function LoginPage() {
           <div className="lg:hidden mb-8">
             <div className="flex justify-start">
   <img
-    src="/favicon.png"
+    src={brandLogo}
     alt="Company Logo"
-    className="h-16 w-auto relative z-10"
+    className="h-16 w-auto relative z-10 object-contain"
+    onError={(e) => {
+      (e.target as HTMLImageElement).src = '/favicon.png'
+    }}
   />
 </div>
           </div>
 
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-navy-900 mb-1.5">Welcome back</h1>
-            <p className="text-slate-500 text-sm">Sign in to your ZenithOS account</p>
+            <p className="text-slate-500 text-sm">Sign in to your {brandName} account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -174,11 +191,12 @@ export default function LoginPage() {
               <span className="text-xs text-slate-400 font-medium">Demo accounts</span>
               <div className="flex-1 h-px bg-slate-200" />
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { label: 'Super Admin', role: 'super_admin' as const, color: '#F4511E' },
                 { label: 'Team Member', role: 'team_member' as const, color: '#4F46E5' },
                 { label: 'Client', role: 'client' as const, color: '#10B981' },
+                { label: 'Client Viewer', role: 'client_viewer' as const, color: '#0EA5E9' },
               ].map(d => (
                 <button
                   key={d.role}

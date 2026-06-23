@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
-import { CreditCard, Smartphone, Building2, CheckCircle, IndianRupee } from 'lucide-react'
+import { CreditCard, Smartphone, Building2, CheckCircle, IndianRupee, XCircle, AlertCircle } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Avatar, Modal } from '../components/ui/index'
 import { formatCurrency, formatDate } from '../lib/utils'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import api from '../lib/api'
 
 export default function PaymentsPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const isAdmin = user?.role === 'super_admin'
 
   const [payments, setPayments] = useState<any[]>([])
@@ -54,7 +56,7 @@ export default function PaymentsPage() {
       setPayStep('method')
       setShowRazorpay(true)
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message)
+      toast.error(err.response?.data?.error || err.message)
     }
   }
 
@@ -73,7 +75,7 @@ export default function PaymentsPage() {
         fetchData()
       }, 1500)
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message)
+      toast.error(err.response?.data?.error || err.message)
       setPayStep('method')
     }
   }
@@ -200,13 +202,29 @@ export default function PaymentsPage() {
                     </td>
                     <td className="table-cell text-sm text-slate-500">{formatDate(payment.paidAt)}</td>
                     <td className="table-cell">
-                      {payment.status === 'success' ? (
-                        <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
-                          <CheckCircle size={12} /> Paid
+                      {payment.status === 'success' && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle size={11} /> Paid
                         </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
-                          <CheckCircle size={12} /> Pending
+                      )}
+                      {payment.status === 'pending' && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                          <AlertCircle size={11} /> Pending
+                        </span>
+                      )}
+                      {payment.status === 'failed' && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                          <XCircle size={11} /> Failed
+                        </span>
+                      )}
+                      {payment.status === 'partial' && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                          <AlertCircle size={11} /> Partial
+                        </span>
+                      )}
+                      {!['success', 'pending', 'failed', 'partial'].includes(payment.status) && (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-50 text-slate-700 border border-slate-200">
+                          {payment.status}
                         </span>
                       )}
                     </td>

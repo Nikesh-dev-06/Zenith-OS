@@ -57,6 +57,11 @@ app.use('/api/notifications', require('./routes/notifications'))
 app.use('/api/dashboard', require('./routes/dashboard'))
 app.use('/api/reports', require('./routes/reports'))
 app.use('/api/activity', require('./routes/activity'))
+app.use('/api/webhooks', require('./routes/webhooks'))
+app.use('/api/recurring', require('./routes/recurring'))
+app.use('/api/automation', require('./routes/automation'))
+app.use('/api/proposals', require('./routes/proposals'))
+app.use('/api/contracts', require('./routes/contracts'))
 
 // ── Health Check ──────────────────────────────────────────
 app.get('/health', (req, res) => {

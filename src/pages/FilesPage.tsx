@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Upload, Search, Download, Eye, Edit, FileText, Image, Archive } from 'lucide-react'
+import { Upload, Search, Download, Eye, Edit, FileText, Image, Archive, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
-import { Avatar, EmptyState, Modal } from '../components/ui/index'
+import { Avatar, EmptyState, Modal, Skeleton, ConfirmationModal } from '../components/ui/index'
 import { formatFileSize, formatDate, getFileIcon } from '../lib/utils'
 import api from '../lib/api'
+import { useToast } from '../context/ToastContext'
 
 const FILE_TYPE_COLORS: Record<string, string> = {
   pdf: 'bg-rose-50 text-rose-600',
@@ -18,6 +19,7 @@ const FILE_TYPE_COLORS: Record<string, string> = {
 }
 
 export default function FilesPage() {
+  const toast = useToast()
   const [search, setSearch] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [showUpload, setShowUpload] = useState(false)
@@ -30,6 +32,55 @@ export default function FilesPage() {
   const [files, setFiles] = useState<any[]>([])
   const [projectsList, setProjectsList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Sorting and Deletion states
+  const [sortField, setSortField] = useState<'name' | 'size' | 'createdAt' | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+
+  const [customUploadName, setCustomUploadName] = useState('')
+  const [uploadDescription, setUploadDescription] = useState('')
+  const [conflictAction, setConflictAction] = useState<'create' | 'version' | 'overwrite'>('create')
+  const [hasConflict, setHasConflict] = useState(false)
+
+  const resetUploadState = () => {
+    setShowUpload(false)
+    setUploadFile(null)
+    setSelectedProjectId('')
+    setCustomUploadName('')
+    setUploadDescription('')
+    setConflictAction('create')
+    setHasConflict(false)
+  }
+
+  // Conflict detection hook
+  useEffect(() => {
+    if (!uploadFile || !selectedProjectId) {
+      setHasConflict(false)
+      setConflictAction('create')
+      return
+    }
+    const ext = uploadFile.name.split('.').pop()?.toLowerCase() || ''
+    let name = customUploadName.trim() || uploadFile.name
+    if (customUploadName && !customUploadName.trim().toLowerCase().endsWith('.' + ext)) {
+      name = customUploadName.trim() + '.' + ext
+    }
+
+    const duplicateExists = files.some(
+      f => f.name.toLowerCase() === name.toLowerCase() &&
+           f.projectId === selectedProjectId &&
+           !f.deletedAt
+    )
+
+    if (duplicateExists) {
+      setHasConflict(true)
+      setConflictAction('version')
+    } else {
+      setHasConflict(false)
+      setConflictAction('create')
+    }
+  }, [uploadFile, customUploadName, selectedProjectId, files])
 
   const fetchFiles = () => {
     api.get('/files')
@@ -52,43 +103,77 @@ export default function FilesPage() {
 
   const handleUpload = () => {
     if (!uploadFile || !selectedProjectId) {
-      alert('Please select a file and a project to upload.')
+      toast.error('Please select a file and a project to upload.')
       return
     }
     const formData = new FormData()
     formData.append('files', uploadFile)
     formData.append('projectId', selectedProjectId)
     formData.append('isClientVisible', 'true')
+    if (customUploadName.trim()) {
+      formData.append('customName', customUploadName.trim())
+    }
+    if (uploadDescription.trim()) {
+      formData.append('description', uploadDescription.trim())
+    }
+    formData.append('conflictAction', conflictAction)
 
     api.post('/files/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
       .then(() => {
         fetchFiles()
-        setShowUpload(false)
-        setUploadFile(null)
-        setSelectedProjectId('')
+        resetUploadState()
+        toast.success('File uploaded successfully.')
       })
       .catch(err => {
-        alert(err.response?.data?.error || err.message)
+        toast.error(err.response?.data?.error || err.message)
       })
   }
 
   const handleDeleteFile = (id: string) => {
-    if (!confirm('Are you sure you want to delete this file?')) return
-    api.delete(`/files/${id}`)
+    setPendingDeleteId(id)
+    setConfirmDeleteOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (!pendingDeleteId) return
+    setLoading(true)
+    api.delete(`/files/${pendingDeleteId}`)
       .then(() => {
         fetchFiles()
+        toast.success('File deleted successfully.')
       })
       .catch(err => {
-        alert(err.response?.data?.error || err.message)
+        toast.error(err.response?.data?.error || err.message)
       })
+      .finally(() => {
+        setLoading(false)
+      })
+  }
+
+  const handleSort = (field: 'name' | 'size' | 'createdAt') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
   }
 
   const filtered = files.filter(f =>
     f.name.toLowerCase().includes(search.toLowerCase()) ||
     f.uploadedByName?.toLowerCase().includes(search.toLowerCase())
   )
+
+  const sortedFiles = [...filtered].sort((a, b) => {
+    if (!sortField) return 0
+    let aVal = a[sortField] || ''
+    let bVal = b[sortField] || ''
+    if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+    if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+    return 0
+  })
 
   return (
     <Layout title="Files">
@@ -116,7 +201,7 @@ export default function FilesPage() {
         </div>
         <p className="text-sm font-semibold text-navy-900 mb-1">Drag &amp; drop files here</p>
         <p className="text-xs text-slate-500">or <span className="text-orange-600 font-medium cursor-pointer hover:underline">browse to upload</span></p>
-        <p className="text-xs text-slate-400 mt-2">PDF, PNG, JPG, PSD, AI, ZIP, DOCX, PPTX supported</p>
+        <p className="text-xs text-slate-400 mt-2">All file types supported (Max 100MB)</p>
       </div>
 
       {/* Search */}
@@ -134,13 +219,22 @@ export default function FilesPage() {
             <p><strong>Size:</strong> {formatFileSize(viewFile.size)}</p>
             <p><strong>Uploaded By:</strong> {viewFile.uploadedByName}</p>
             <p><strong>Version:</strong> v{viewFile.version}</p>
+            {viewFile.description && <p><strong>Description:</strong> {viewFile.description}</p>}
             <p><strong>Date:</strong> {formatDate(viewFile.createdAt)}</p>
-            <button
-              className="btn-primary w-full justify-center mt-2"
-              onClick={() => window.open(viewFile.url, '_blank')}
-            >
-              <Download size={14} /> Download File
-            </button>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                className="btn-primary w-full justify-center"
+                onClick={() => window.open(viewFile.url, '_blank')}
+              >
+                <Download size={14} /> Download File
+              </button>
+              <button
+                className="btn-secondary w-full justify-center"
+                onClick={() => { setShowView(false); window.location.href = `/files/${viewFile.id}/metadata`; }}
+              >
+                📄 Open Metadata Page
+              </button>
+            </div>
           </div>
         </Modal>
       )}
@@ -158,8 +252,9 @@ export default function FilesPage() {
                   .then(() => {
                     fetchFiles()
                     setShowEdit(false)
+                    toast.success('File renamed successfully.')
                   })
-                  .catch(err => alert(err.response?.data?.error || err.message))
+                  .catch(err => toast.error(err.response?.data?.error || err.message))
               }}>Save</button>
             </div>
           </div>
@@ -168,7 +263,7 @@ export default function FilesPage() {
 
       {/* Upload Modal */}
       {showUpload && (
-        <Modal open={true} onClose={() => setShowUpload(false)} title="Upload File" size="sm">
+        <Modal open={true} onClose={resetUploadState} title="Upload File" size="sm">
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Project *</label>
@@ -183,33 +278,110 @@ export default function FilesPage() {
               <label className="block text-xs font-semibold text-slate-700 mb-1">File *</label>
               <input type="file" className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
             </div>
+
+            {uploadFile && (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Rename File (Optional)</label>
+                  <input
+                    type="text"
+                    className="input text-sm py-2"
+                    placeholder="Leave empty to use original name"
+                    value={customUploadName}
+                    onChange={e => setCustomUploadName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Description (Optional)</label>
+                  <textarea
+                    className="input text-sm py-2 h-16 resize-none"
+                    placeholder="Add a brief description of the file..."
+                    value={uploadDescription}
+                    onChange={e => setUploadDescription(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {hasConflict && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-2">
+                <p className="font-semibold flex items-center gap-1">⚠️ File with this name already exists.</p>
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-2 cursor-pointer font-medium">
+                    <input
+                      type="radio"
+                      name="conflictAction"
+                      value="version"
+                      checked={conflictAction === 'version'}
+                      onChange={() => setConflictAction('version')}
+                      className="text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    Upload as new version (increment version)
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer font-medium">
+                    <input
+                      type="radio"
+                      name="conflictAction"
+                      value="overwrite"
+                      checked={conflictAction === 'overwrite'}
+                      onChange={() => setConflictAction('overwrite')}
+                      className="text-orange-600 focus:ring-orange-500 cursor-pointer"
+                    />
+                    Overwrite/replace existing file entry
+                  </label>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-2">
-              <button className="btn-secondary flex-1" onClick={() => setShowUpload(false)}>Cancel</button>
+              <button className="btn-secondary flex-1" onClick={resetUploadState}>Cancel</button>
               <button className="btn-primary flex-1 justify-center" onClick={handleUpload}>Upload</button>
             </div>
           </div>
         </Modal>
       )}
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="card p-6 space-y-4">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState icon="📁" title="No files found" description="Upload your first file or adjust your search." />
       ) : (
         <div className="card overflow-hidden">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="table-header text-left">File</th>
+                <th className="table-header text-left cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('name')}>
+                  <div className="flex items-center gap-1">
+                    <span>File</span>
+                    {sortField === 'name' ? (sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} />}
+                  </div>
+                </th>
                 <th className="table-header text-left">Project</th>
                 <th className="table-header text-left">Uploaded By</th>
-                <th className="table-header text-left">Size</th>
+                <th className="table-header text-left cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('size')}>
+                  <div className="flex items-center gap-1">
+                    <span>Size</span>
+                    {sortField === 'size' ? (sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} />}
+                  </div>
+                </th>
                 <th className="table-header text-left">Version</th>
                 <th className="table-header text-left">Downloads</th>
-                <th className="table-header text-left">Date</th>
+                <th className="table-header text-left cursor-pointer hover:bg-slate-100 select-none" onClick={() => handleSort('createdAt')}>
+                  <div className="flex items-center gap-1">
+                    <span>Date</span>
+                    {sortField === 'createdAt' ? (sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : <ArrowUpDown size={12} />}
+                  </div>
+                </th>
                 <th className="table-header text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(file => (
+              {sortedFiles.map(file => (
                 <tr key={file.id} className="table-row">
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
@@ -260,6 +432,16 @@ export default function FilesPage() {
           </table>
         </div>
       )}
+      <ConfirmationModal
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete File?"
+        message="Are you sure you want to permanently delete this file? This action is destructive and cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </Layout>
   )
 }

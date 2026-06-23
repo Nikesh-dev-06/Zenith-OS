@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react'
-import { CheckCircle, XCircle, Clock, MessageSquare, FileText } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, MessageSquare, FileText, CheckCheck } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { ApprovalStatusBadge, EmptyState, Modal } from '../components/ui/index'
 import { formatRelativeTime } from '../lib/utils'
 import type { ApprovalStatus } from '../types'
 import api from '../lib/api'
+import { useToast } from '../context/ToastContext'
+
+const fonts = [
+  { id: 'font-1', name: 'Elegant Script', family: "'Brush Script MT', cursive, sans-serif" },
+  { id: 'font-2', name: 'Calligraphy', family: "'Lucida Handwriting', cursive, sans-serif" },
+  { id: 'font-3', name: 'Modern Cursive', family: "cursive, sans-serif" }
+]
 
 export default function ApprovalsPage() {
+  const toast = useToast()
   const [filter, setFilter] = useState<ApprovalStatus | 'all'>('all')
   const [selected, setSelected] = useState<string | null>(null)
   const [comment, setComment] = useState('')
@@ -35,9 +43,10 @@ export default function ApprovalsPage() {
         fetchApprovals()
         setSelected(null)
         setComment('')
+        toast.success(`Approval request updated.`)
       })
       .catch(err => {
-        alert(err.response?.data?.error || err.message)
+        toast.error(err.response?.data?.error || err.message)
       })
   }
 
@@ -136,10 +145,13 @@ export default function ApprovalsPage() {
               <div className="bg-slate-50 rounded-xl p-3">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Attached Files</p>
                 {selectedApproval.fileIds.map((file: any) => (
-                  <div key={file._id || file.id} className="flex items-center gap-2.5 p-2 bg-white rounded-lg border border-slate-100 mb-1.5">
-                    <FileText size={16} className="text-rose-500" />
-                    <span className="text-sm text-navy-900 font-medium flex-1">{file.name}</span>
-                    <button className="text-xs text-orange-600 font-semibold hover:underline" onClick={() => window.open(`http://localhost:5000/api/files/download-raw/${file._id || file.id}`, '_blank')}>Download</button>
+                  <div key={file._id || file.id} className="flex items-start gap-2.5 p-2 bg-white rounded-lg border border-slate-100 mb-1.5">
+                    <FileText size={16} className="text-rose-500 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-navy-900 font-medium block">{file.name}</span>
+                      {file.description && <span className="text-xs text-slate-500 mt-0.5 block">{file.description}</span>}
+                    </div>
+                    <button className="text-xs text-orange-600 font-semibold hover:underline mt-0.5" onClick={() => window.open(`http://localhost:5000/api/files/download-raw/${file._id || file.id}`, '_blank')}>Download</button>
                   </div>
                 ))}
               </div>
@@ -149,6 +161,41 @@ export default function ApprovalsPage() {
               <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
                 <p className="text-xs font-semibold text-amber-700 mb-1">Client Comment</p>
                 <p className="text-sm text-amber-800">"{selectedApproval.comment}"</p>
+              </div>
+            )}
+
+            {selectedApproval.status === 'approved' && (selectedApproval.signatureText || selectedApproval.signatureDrawn) && (
+              <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3.5 flex items-center gap-3">
+                {selectedApproval.signatureDrawn && selectedApproval.signatureDrawn.startsWith('STAMP:') ? (
+                  <div className="flex-shrink-0 bg-white rounded-full p-1 border border-emerald-200">
+                    <svg width="48" height="48" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="45" fill="none" stroke="#10B981" strokeWidth="3" strokeDasharray="3,3" />
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="#10B981" strokeWidth="1.5" />
+                      <text x="50" y="47" textAnchor="middle" fill="#10B981" fontSize="22" fontWeight="bold" fontFamily="sans-serif">
+                        {selectedApproval.signatureDrawn.split(':')[1] || 'JD'}
+                      </text>
+                      <text x="50" y="66" textAnchor="middle" fill="#10B981" fontSize="10" fontWeight="bold" fontFamily="sans-serif" letterSpacing="0.5">
+                        SIGNED
+                      </text>
+                      <text x="50" y="78" textAnchor="middle" fill="#10B981" fontSize="7" fontFamily="sans-serif">
+                        SECURE
+                      </text>
+                    </svg>
+                  </div>
+                ) : null}
+                <div>
+                  <div className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold">
+                    <CheckCheck size={14} /> Digitally Signed & Verified
+                  </div>
+                  {selectedApproval.signatureText && (
+                    <p className="text-base text-slate-800 font-medium italic my-0.5" style={{ fontFamily: selectedApproval.signatureDrawn?.startsWith('FONT:') ? fonts.find(f => f.id === selectedApproval.signatureDrawn.split(':')[1])?.family || 'cursive' : 'cursive' }}>
+                      {selectedApproval.signatureText}
+                    </p>
+                  )}
+                  {selectedApproval.signedAt && (
+                    <p className="text-[10px] text-slate-400">Timestamp: {new Date(selectedApproval.signedAt).toLocaleString()}</p>
+                  )}
+                </div>
               </div>
             )}
 

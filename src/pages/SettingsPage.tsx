@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Save, Building2, Mail, Bell, Shield, Palette } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Logo } from '../components/ui/Logo'
+import { useToast } from '../context/ToastContext'
 
 const TABS = [
   { id: 'agency', label: 'Agency Profile', icon: Building2 },
@@ -13,6 +14,29 @@ const TABS = [
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('agency')
+  const toast = useToast()
+
+  // Branding Settings States
+  const [brandName, setBrandName] = useState(() => localStorage.getItem('zenithos_brand_name') || 'ZenithOS')
+  const [brandLogo, setBrandLogo] = useState(() => localStorage.getItem('zenithos_brand_logo') || '/favicon.png')
+  const [accentTheme, setAccentTheme] = useState(() => localStorage.getItem('zenithos_brand_accent') || 'Orange')
+  const [invoiceFooter, setInvoiceFooter] = useState(() => localStorage.getItem('zenithos_invoice_footer') || 'Thank you for choosing Zenith Creative. We look forward to continuing our work together.')
+  const [welcomeMessage, setWelcomeMessage] = useState(() => localStorage.getItem('zenithos_welcome_message') || 'Welcome to your Zenith Creative project portal. Here you can track progress, review files, and manage invoices.')
+
+  const handleSaveBranding = () => {
+    localStorage.setItem('zenithos_brand_name', brandName)
+    localStorage.setItem('zenithos_brand_logo', brandLogo)
+    localStorage.setItem('zenithos_brand_accent', accentTheme)
+    localStorage.setItem('zenithos_invoice_footer', invoiceFooter)
+    localStorage.setItem('zenithos_welcome_message', welcomeMessage)
+    
+    // Apply accent theme immediately
+    import('../lib/theme').then(({ applyAccentTheme }) => {
+      applyAccentTheme(accentTheme as any)
+    })
+    
+    toast.success('Branding configurations saved and applied successfully!')
+  }
 
   return (
     <Layout title="Settings">
@@ -50,16 +74,18 @@ export default function SettingsPage() {
               <h2 className="section-title">Agency Profile</h2>
               <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
                 <div className="flex justify-start">
-  <img
-    src="/favicon.png"
-    alt="Company Logo"
-    className="h-16 w-auto relative z-10"
-  />
-</div>
+                  <img
+                    src={brandLogo}
+                    alt="Company Logo"
+                    className="h-16 w-auto relative z-10 object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/favicon.png'
+                    }}
+                  />
+                </div>
                 <div>
-                  <p className="font-semibold text-navy-900">Zenith Creative</p>
+                  <p className="font-semibold text-navy-900">{brandName}</p>
                   <p className="text-xs text-slate-500">zenithcreative.in</p>
-                  <button className="text-xs text-orange-600 font-semibold mt-1 hover:underline">Change logo</button>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -181,32 +207,71 @@ export default function SettingsPage() {
 
           {activeTab === 'branding' && (
             <div className="card p-6 space-y-5">
-              <h2 className="section-title">Branding</h2>
-              <div className="bg-slate-50 rounded-xl p-4">
-                <p className="text-xs font-semibold text-slate-600 mb-3">Current Brand Colors</p>
-                <div className="flex gap-3 flex-wrap">
-                  {[
-                    { label: 'Primary', color: '#F4511E' },
-                    { label: 'Secondary', color: '#FF8C42' },
-                    { label: 'Navy', color: '#0F172A' },
-                    { label: 'Success', color: '#10B981' },
-                  ].map(c => (
-                    <div key={c.label} className="text-center">
-                      <div className="w-10 h-10 rounded-xl mb-1.5 shadow-sm border border-slate-200" style={{ background: c.color }} />
-                      <p className="text-xs text-slate-500">{c.label}</p>
-                    </div>
-                  ))}
+              <h2 className="section-title">Branding Configuration</h2>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Agency/Brand Name</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={brandName} 
+                    onChange={e => setBrandName(e.target.value)} 
+                    placeholder="e.g. Zenith Creative" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Brand Accent Theme</label>
+                  <select 
+                    className="input" 
+                    value={accentTheme} 
+                    onChange={e => setAccentTheme(e.target.value)}
+                  >
+                    <option value="Orange">Orange (Default)</option>
+                    <option value="Blue">Blue</option>
+                    <option value="Emerald">Emerald</option>
+                    <option value="Indigo">Indigo</option>
+                    <option value="Violet">Violet</option>
+                  </select>
                 </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">Brand Logo URL</label>
+                <input 
+                  type="text" 
+                  className="input" 
+                  value={brandLogo} 
+                  onChange={e => setBrandLogo(e.target.value)} 
+                  placeholder="https://example.com/logo.png" 
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">Invoice Footer Text</label>
-                <textarea className="input h-16 resize-none" defaultValue="Thank you for choosing Zenith Creative. We look forward to continuing our work together." />
+                <textarea 
+                  className="input h-16 resize-none" 
+                  value={invoiceFooter} 
+                  onChange={e => setInvoiceFooter(e.target.value)} 
+                />
               </div>
+
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1.5">Client Portal Welcome Message</label>
-                <textarea className="input h-16 resize-none" defaultValue="Welcome to your Zenith Creative project portal. Here you can track progress, review files, and manage invoices." />
+                <textarea 
+                  className="input h-16 resize-none" 
+                  value={welcomeMessage} 
+                  onChange={e => setWelcomeMessage(e.target.value)} 
+                />
               </div>
-              <button className="btn-primary"><Save size={14} /> Save Branding</button>
+
+              <button 
+                type="button" 
+                onClick={handleSaveBranding} 
+                className="btn-primary flex items-center gap-2 cursor-pointer"
+              >
+                <Save size={14} /> Save Branding
+              </button>
             </div>
           )}
         </div>

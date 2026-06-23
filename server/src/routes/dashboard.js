@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const mongoose = require('mongoose')
 const { Client, Project, Invoice, Payment, Approval, ActivityLog, Task } = require('../models')
 const { authenticate } = require('../middleware/auth')
 
@@ -10,10 +11,10 @@ router.get('/', async (req, res) => {
     const isClient = req.user.role === 'client'
     const clientId = req.user.clientId
 
-    // Query filters based on role
-    const clientQuery = isClient ? { clientId, deletedAt: null } : { deletedAt: null }
-    const invoiceQuery = isClient ? { clientId } : {}
-    const approvalQuery = isClient ? { clientId } : {}
+    // Query filters based on role - cast clientId to ObjectId for raw aggregate matching
+    const clientQuery = isClient ? { clientId: mongoose.Types.ObjectId(clientId), deletedAt: null } : { deletedAt: null }
+    const invoiceQuery = isClient ? { clientId: mongoose.Types.ObjectId(clientId) } : {}
+    const approvalQuery = isClient ? { clientId: mongoose.Types.ObjectId(clientId) } : {}
     const activityQuery = isClient ? { userId: req.user._id } : {}
 
     // 1. Fetch counts
@@ -42,9 +43,11 @@ router.get('/', async (req, res) => {
       .filter(i => new Date(i.paidAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
       .reduce((s, i) => s + i.total, 0)
 
-    // 2. Compute 6 months of revenue points
+    // 2. Compute dynamic months of revenue points
+    const monthsParam = parseInt(req.query.months) || 6
+    const monthsLimit = [3, 6, 12].includes(monthsParam) ? monthsParam : 6
     const revenueData = []
-    for (let i = 5; i >= 0; i--) {
+    for (let i = monthsLimit - 1; i >= 0; i--) {
       const date = new Date()
       date.setMonth(date.getMonth() - i)
       const start = new Date(date.getFullYear(), date.getMonth(), 1)

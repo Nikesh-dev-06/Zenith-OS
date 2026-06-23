@@ -5,20 +5,33 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount)
+export function formatCurrency(amount: number, currency: string = 'INR'): string {
+  try {
+    const isINR = currency.toUpperCase() === 'INR'
+    return new Intl.NumberFormat(isINR ? 'en-IN' : 'en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+      maximumFractionDigits: isINR ? 0 : 2,
+    }).format(amount)
+  } catch (e) {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
 }
 
 export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-IN', {
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return '—'
+  const tzString = date.toLocaleTimeString(undefined, { timeZoneName: 'short' }).split(' ').pop() || ''
+  const dateStr = date.toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   })
+  return `${dateStr} (${tzString})`
 }
 
 export function formatRelativeTime(dateString: string): string {

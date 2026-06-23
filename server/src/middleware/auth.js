@@ -32,5 +32,12 @@ exports.authorize = (...roles) => (req, res, next) => {
   next()
 }
 
+exports.readOnlyForViewer = (req, res, next) => {
+  if (req.user.role === 'client_viewer' && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Client Viewer accounts have read-only access' })
+  }
+  next()
+}
+
 exports.agencyOnly = exports.authorize('super_admin', 'team_member')
 exports.adminOnly = exports.authorize('super_admin')
