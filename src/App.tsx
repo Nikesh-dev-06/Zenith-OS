@@ -29,6 +29,7 @@ import PortalApprovalsPage from './pages/portal/PortalApprovalsPage'
 import PortalProposalsPage from './pages/portal/PortalProposalsPage'
 import PortalContractsPage from './pages/portal/PortalContractsPage'
 import PortalInvoicesPage from './pages/portal/PortalInvoicesPage'
+import PortalPaymentsPage from './pages/portal/PortalPaymentsPage'
 import PortalSupportPage from './pages/portal/PortalSupportPage'
 import PortalProfilePage from './pages/portal/PortalProfilePage'
 import SupportTicketsPage from './pages/SupportTicketsPage'
@@ -122,6 +123,7 @@ function AppRoutes() {
       <Route path="/portal/approvals" element={<ProtectedRoute><PortalApprovalsPage /></ProtectedRoute>} />
       <Route path="/portal/contracts" element={<ProtectedRoute><PortalContractsPage /></ProtectedRoute>} />
       <Route path="/portal/invoices" element={<ProtectedRoute><PortalInvoicesPage /></ProtectedRoute>} />
+      <Route path="/portal/payments" element={<ProtectedRoute><PortalPaymentsPage /></ProtectedRoute>} />
       <Route path="/portal/support" element={<ProtectedRoute><PortalSupportPage /></ProtectedRoute>} />
       <Route path="/portal/profile" element={<ProtectedRoute><PortalProfilePage /></ProtectedRoute>} />
 

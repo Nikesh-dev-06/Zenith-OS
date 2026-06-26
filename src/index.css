@@ -275,3 +275,140 @@
 .dark .btn-ghost {
   @apply text-slate-400 hover:bg-slate-800 hover:text-slate-100;
 }
+
+/* ── Webkit & Input Controls in Dark Mode ── */
+.dark input[type="date"] {
+  color-scheme: dark;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  @apply bg-slate-800;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-700;
+}
+
+/* Custom Text and custom elements class overrides in dark mode */
+.dark .text-slate-805,
+.dark .text-slate-850,
+.dark .text-slate-650 {
+  @apply text-slate-100;
+}
+
+/* ── Alert & Card Color Mapping Overrides in Dark Mode ── */
+.dark .bg-amber-50,
+.dark .bg-amber-50\/20,
+.dark .bg-amber-50\/50 {
+  background-color: rgba(120, 53, 4, 0.15) !important;
+  border-color: rgba(217, 119, 6, 0.25) !important;
+}
+
+.dark .bg-emerald-50,
+.dark .bg-emerald-50\/50 {
+  background-color: rgba(6, 78, 59, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+.dark .bg-rose-50,
+.dark .bg-rose-50\/50 {
+  background-color: rgba(136, 19, 55, 0.15) !important;
+  border-color: rgba(244, 63, 94, 0.25) !important;
+}
+
+.dark .bg-blue-50,
+.dark .bg-blue-50\/50 {
+  background-color: rgba(30, 58, 138, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+.dark .bg-orange-50,
+.dark .bg-orange-50\/80 {
+  background-color: rgba(124, 45, 18, 0.15) !important;
+  border-color: rgba(244, 81, 30, 0.25) !important;
+}
+
+/* ── Alert Text readability Overrides in Dark Mode ── */
+.dark .text-amber-700,
+.dark .text-amber-800 {
+  color: rgb(252, 211, 77) !important; /* amber-300 */
+}
+
+.dark .text-emerald-600,
+.dark .text-emerald-700,
+.dark .text-emerald-850,
+.dark .text-emerald-800 {
+  color: rgb(110, 231, 183) !important; /* emerald-300 */
+}
+
+.dark .text-rose-600,
+.dark .text-rose-700,
+.dark .text-rose-800 {
+  color: rgb(252, 165, 165) !important; /* rose-300 */
+}
+
+.dark .text-blue-600,
+.dark .text-blue-750,
+.dark .text-blue-700,
+.dark .text-blue-800 {
+  color: rgb(147, 197, 253) !important; /* blue-300 */
+}
+
+.dark .text-orange-600,
+.dark .text-orange-700 {
+  color: rgb(253, 186, 116) !important; /* orange-300 */
+}
+
+/* ── Generic Hover Safety Interceptors in Dark Mode ── */
+.dark [class*="hover:text-slate-"]:hover,
+.dark [class*="hover:text-navy-"]:hover {
+  color: rgb(241, 245, 249) !important; /* text-slate-100 */
+}
+
+.dark [class*="hover:text-orange-"]:hover {
+  color: rgb(251, 146, 60) !important; /* orange-400 */
+}
+
+.dark [class*="hover:text-emerald-"]:hover {
+  color: rgb(52, 211, 153) !important; /* emerald-400 */
+}
+
+.dark [class*="hover:text-rose-"]:hover {
+  color: rgb(248, 113, 113) !important; /* rose-400 */
+}
+
+.dark [class*="hover:bg-slate-"]:hover,
+.dark [class*="hover:bg-white"]:hover {
+  background-color: rgba(30, 41, 59, 0.65) !important; /* bg-slate-800/65 */
+}
+
+.dark [class*="hover:bg-orange-50"]:hover {
+  background-color: rgba(124, 45, 18, 0.25) !important;
+}
+
+.dark [class*="hover:bg-emerald-50"]:hover {
+  background-color: rgba(6, 78, 59, 0.25) !important;
+}
+
+.dark [class*="hover:bg-rose-50"]:hover {
+  background-color: rgba(136, 19, 55, 0.25) !important;
+}
+
+.dark [class*="hover:bg-amber-50"]:hover {
+  background-color: rgba(120, 53, 4, 0.25) !important;
+}
+
+/* ── Global Form Elements Safety Overrides in Dark Mode ── */
+.dark select,
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]),
+.dark textarea {
+  background-color: rgb(30, 41, 59) !important; /* bg-slate-800 */
+  color: rgb(241, 245, 249) !important; /* text-slate-100 */
+  border-color: rgb(71, 85, 105) !important; /* border-slate-600 */
+  color-scheme: dark !important;
+}
+
+.dark select option {
+  background-color: rgb(15, 23, 42) !important; /* bg-slate-900 */
+  color: rgb(241, 245, 249) !important; /* text-slate-100 */
+}

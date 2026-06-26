@@ -335,11 +335,11 @@ export default function ProposalsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Title *</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Website Design SOW Proposal" className="w-full text-slate-800" />
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Website Design SOW Proposal" className="input" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Client *</label>
-              <select value={clientId} onChange={e => setClientId(e.target.value)} required className="w-full text-slate-800">
+              <select value={clientId} onChange={e => setClientId(e.target.value)} required className="input">
                 <option value="">Select Client</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
               </select>
@@ -349,7 +349,7 @@ export default function ProposalsPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Project (Optional)</label>
-              <select value={projectId} onChange={e => setProjectId(e.target.value)} className="w-full text-slate-800">
+              <select value={projectId} onChange={e => setProjectId(e.target.value)} className="input">
                 <option value="">No Project Link</option>
                 {projects.filter(p => !clientId || p.clientId === clientId).map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -358,7 +358,7 @@ export default function ProposalsPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Currency</label>
-              <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full text-slate-800">
+              <select value={currency} onChange={e => setCurrency(e.target.value)} className="input">
                 <option value="USD">USD ($)</option>
                 <option value="EUR">EUR (€)</option>
                 <option value="GBP">GBP (£)</option>
@@ -368,7 +368,7 @@ export default function ProposalsPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Valid Until *</label>
-              <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} required className="w-full text-slate-800" />
+              <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} required className="input" />
             </div>
           </div>
 
@@ -383,9 +383,9 @@ export default function ProposalsPage() {
             <div className="space-y-2.5 max-h-48 overflow-y-auto border border-slate-100 p-2 rounded-xl">
               {items.map((item, index) => (
                 <div key={index} className="flex gap-2 items-center">
-                  <input type="text" placeholder="Item description..." value={item.description} onChange={e => handleItemChange(index, 'description', e.target.value)} required className="flex-grow text-sm text-slate-800" />
-                  <input type="number" placeholder="Qty" min="1" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)} required className="w-16 text-sm text-slate-800" />
-                  <input type="number" placeholder="Rate" min="0" value={item.rate} onChange={e => handleItemChange(index, 'rate', parseFloat(e.target.value) || 0)} required className="w-24 text-sm text-slate-800" />
+                  <input type="text" placeholder="Item description..." value={item.description} onChange={e => handleItemChange(index, 'description', e.target.value)} required className="flex-grow input text-xs py-1.5" />
+                  <input type="number" placeholder="Qty" min="1" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)} required className="w-16 input text-xs py-1.5" />
+                  <input type="number" placeholder="Rate" min="0" value={item.rate} onChange={e => handleItemChange(index, 'rate', parseFloat(e.target.value) || 0)} required className="w-24 input text-xs py-1.5" />
                   <span className="w-24 text-right font-bold text-xs text-slate-600">{formatCurrency(item.amount, currency)}</span>
                   {items.length > 1 && (
                     <button type="button" onClick={() => removeItem(index)} className="text-rose-500 p-1 hover:bg-rose-50 rounded-lg">
@@ -400,24 +400,24 @@ export default function ProposalsPage() {
           <div className="grid grid-cols-3 gap-4 border-t border-slate-100 pt-3">
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Discount Type</label>
-              <select value={discountType} onChange={e => setDiscountType(e.target.value as any)} className="w-full text-slate-800">
+              <select value={discountType} onChange={e => setDiscountType(e.target.value as any)} className="input">
                 <option value="percent">Percent (%)</option>
                 <option value="flat">Flat Amount</option>
               </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Discount Value</label>
-              <input type="number" value={discountValue} onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)} min="0" className="w-full text-slate-800" />
+              <input type="number" value={discountValue} onChange={e => setDiscountValue(parseFloat(e.target.value) || 0)} min="0" className="input" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Tax Rate (%)</label>
-              <input type="number" value={taxRate} onChange={e => setTaxRate(parseFloat(e.target.value) || 0)} min="0" className="w-full text-slate-800" />
+              <input type="number" value={taxRate} onChange={e => setTaxRate(parseFloat(e.target.value) || 0)} min="0" className="input" />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Notes & Terms</label>
-            <textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Terms of work, payment timelines..." className="w-full text-slate-800 rounded-xl" />
+            <textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Terms of work, payment timelines..." className="input h-20 resize-none" />
           </div>
 
           <div className="flex justify-between items-center pt-3 border-t border-slate-100">
@@ -444,7 +444,7 @@ export default function ProposalsPage() {
               value={signatureText} 
               onChange={e => setSignatureText(e.target.value)} 
               placeholder="e.g. John Doe" 
-              className="w-full text-slate-800"
+              className="input"
             />
           </div>
 

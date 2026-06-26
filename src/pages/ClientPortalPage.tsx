@@ -40,6 +40,7 @@ export default function ClientPortalPage() {
   const [selectedFont, setSelectedFont] = useState('font-1')
   const [initials, setInitials] = useState('')
   const [agreed, setAgreed] = useState(false)
+  const [sigProvider, setSigProvider] = useState<'local' | 'docusign' | 'zohosign'>('local')
 
   // Razorpay payment states
   const [showRazorpay, setShowRazorpay] = useState(false)
@@ -79,6 +80,34 @@ export default function ClientPortalPage() {
     fetchData()
     const savedMsg = localStorage.getItem('zenithos_welcome_message')
     if (savedMsg) setWelcomeMessage(savedMsg)
+  }, [user])
+
+  // External signature redirect callback verifier for Approvals
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const verifyExternal = params.get('verify_external')
+    const approvalId = params.get('approval_id')
+    const provider = params.get('provider')
+    const signer = params.get('signer')
+
+    if (verifyExternal === 'true' && approvalId && provider) {
+      toast.info(`Verifying external signature via ${provider === 'docusign' ? 'DocuSign' : 'Zoho Sign'}...`)
+      
+      api.post(`/approvals/${approvalId}/external-callback`, {
+        provider,
+        signerName: signer || user?.name || 'Authorized Signer'
+      })
+        .then(() => {
+          toast.success(`Approval request signed successfully via ${provider === 'docusign' ? 'DocuSign' : 'Zoho Sign'}!`)
+          // Clean parameters from url
+          const cleanUrl = window.location.pathname
+          window.history.replaceState({}, document.title, cleanUrl)
+          fetchData()
+        })
+        .catch(err => {
+          toast.error(err.response?.data?.error || err.message)
+        })
+    }
   }, [user])
 
   const handleApprovalResponse = async (status: 'approved' | 'revision_requested') => {
@@ -414,9 +443,14 @@ export default function ClientPortalPage() {
                 <span>{formatCurrency(invoices.reduce((sum, inv) => sum + inv.total, 0))}</span>
               </div>
             </div>
-            <a href="/portal/invoices" className="btn-primary w-full justify-center text-xs py-2 cursor-pointer">
-              Manage Invoices
-            </a>
+            <div className="flex gap-2">
+              <a href="/portal/payments" className="btn-primary flex-1 justify-center text-xs py-2 cursor-pointer">
+                Manage Payments
+              </a>
+              <a href="/portal/invoices" className="btn-secondary flex-1 justify-center text-xs py-2 cursor-pointer">
+                Invoices
+              </a>
+            </div>
           </div>
 
           {/* Upcoming Deliverables / Milestones */}
@@ -544,142 +578,232 @@ export default function ClientPortalPage() {
               </div>
             ) : modalAction === 'approve' ? (
               <div className="space-y-4 animate-fadeIn">
-                <div className="border-b border-slate-100 pb-3">
-                  <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider mb-2">{t('eSignatureVerification')}</h4>
-                  <div className="flex gap-2 bg-slate-100 rounded-lg p-1 text-xs w-fit">
-                    <button
-                      type="button"
-                      className={`px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer ${sigType === 'typed' ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                      onClick={() => setSigType('typed')}
-                    >
-                      {t('typeSignature')}
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer ${sigType === 'drawn' ? 'bg-white text-navy-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                      onClick={() => setSigType('drawn')}
-                    >
-                      {t('sealStamp')}
-                    </button>
-                  </div>
+                <p className="text-xs text-slate-500">Choose your preferred signature provider to authorize this deliverable.</p>
+
+                {/* Provider Selection */}
+                <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
+                  <button
+                    onClick={() => setSigProvider('local')}
+                    className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer ${
+                      sigProvider === 'local' ? 'bg-white dark:bg-slate-700 text-navy-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-750 dark:text-slate-400'
+                    }`}
+                  >
+                    Zenith Local
+                  </button>
+                  <button
+                    onClick={() => setSigProvider('docusign')}
+                    className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer ${
+                      sigProvider === 'docusign' ? 'bg-white dark:bg-slate-700 text-navy-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-750 dark:text-slate-400'
+                    }`}
+                  >
+                    DocuSign
+                  </button>
+                  <button
+                    onClick={() => setSigProvider('zohosign')}
+                    className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer ${
+                      sigProvider === 'zohosign' ? 'bg-white dark:bg-slate-700 text-navy-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-750 dark:text-slate-400'
+                    }`}
+                  >
+                    Zoho Sign
+                  </button>
                 </div>
 
-                {sigType === 'typed' ? (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">{t('typeName')} *</label>
-                      <input
-                        type="text"
-                        className="input"
-                        placeholder="e.g. John Doe"
-                        value={typedName}
-                        onChange={e => setTypedName(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">{t('signatureStyle')}</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {fonts.map(f => (
-                          <button
-                            type="button"
-                            key={f.id}
-                            className={`px-2 py-1.5 rounded-lg border text-xs text-center transition-all cursor-pointer ${selectedFont === f.id ? 'border-orange-500 bg-orange-50 text-orange-700 font-semibold' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}
-                            onClick={() => setSelectedFont(f.id)}
-                            style={{ fontFamily: f.family }}
-                          >
-                            {t('signatureStylePreview')}
-                          </button>
-                        ))}
+                {sigProvider === 'local' ? (
+                  <div className="space-y-4 animate-fadeIn">
+                    <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                      <h4 className="text-xs font-bold text-navy-900 dark:text-white uppercase tracking-wider mb-2">{t('eSignatureVerification')}</h4>
+                      <div className="flex gap-2 bg-slate-100 dark:bg-slate-850 rounded-lg p-1 text-xs w-fit">
+                        <button
+                          type="button"
+                          className={`px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer ${sigType === 'typed' ? 'bg-white dark:bg-slate-700 text-navy-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-405'}`}
+                          onClick={() => setSigType('typed')}
+                        >
+                          {t('typeSignature')}
+                        </button>
+                        <button
+                          type="button"
+                          className={`px-3 py-1.5 rounded-md font-medium transition-all cursor-pointer ${sigType === 'drawn' ? 'bg-white dark:bg-slate-700 text-navy-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-405'}`}
+                          onClick={() => setSigType('drawn')}
+                        >
+                          {t('sealStamp')}
+                        </button>
                       </div>
                     </div>
-                    {typedName.trim() && (
-                      <div className="bg-slate-50 rounded-xl p-4 text-center border border-slate-100">
-                        <span className="text-[10px] text-slate-400 block mb-1">{t('liveSignaturePreview')}</span>
-                        <p
-                          className="text-2xl text-slate-800 italic"
-                          style={{ fontFamily: fonts.find(f => f.id === selectedFont)?.family }}
-                        >
-                          {typedName}
-                        </p>
+
+                    {sigType === 'typed' ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 dark:text-slate-350 mb-1">{t('typeName')} *</label>
+                          <input
+                            type="text"
+                            className="input"
+                            placeholder="e.g. John Doe"
+                            value={typedName}
+                            onChange={e => setTypedName(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 dark:text-slate-350 mb-1">{t('signatureStyle')}</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {fonts.map(f => (
+                              <button
+                                type="button"
+                                key={f.id}
+                                className={`px-2 py-1.5 rounded-lg border text-xs text-center transition-all cursor-pointer ${selectedFont === f.id ? 'border-orange-500 bg-orange-50 text-orange-700 font-semibold' : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-800'}`}
+                                onClick={() => setSelectedFont(f.id)}
+                                style={{ fontFamily: f.family }}
+                              >
+                                {t('signatureStylePreview')}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {typedName.trim() && (
+                          <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 text-center border border-slate-100 dark:border-slate-800">
+                            <span className="text-[10px] text-slate-400 block mb-1">{t('liveSignaturePreview')}</span>
+                            <p
+                              className="text-2xl text-slate-800 dark:text-white italic"
+                              style={{ fontFamily: fonts.find(f => f.id === selectedFont)?.family }}
+                            >
+                              {typedName}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-700 dark:text-slate-350 mb-1">{t('initialsPlaceholder')} *</label>
+                          <input
+                            type="text"
+                            className="input font-mono uppercase"
+                            placeholder="e.g. JD"
+                            maxLength={3}
+                            value={initials}
+                            onChange={e => setInitials(e.target.value)}
+                          />
+                        </div>
+                        {initials.trim() && (
+                          <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 flex flex-col items-center justify-center border border-slate-100 dark:border-slate-800">
+                            <span className="text-[10px] text-slate-400 block mb-2">{t('liveStampPreview')}</span>
+                            <div className="bg-white rounded-full p-1 shadow-sm border border-slate-200">
+                              <svg width="80" height="80" viewBox="0 0 100 100">
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#10B981" strokeWidth="2.5" strokeDasharray="3,3" />
+                                <circle cx="50" cy="50" r="40" fill="none" stroke="#10B981" strokeWidth="1.5" />
+                                <text x="50" y="47" textAnchor="middle" fill="#10B981" fontSize="22" fontWeight="bold" fontFamily="sans-serif">
+                                  {initials.toUpperCase()}
+                                </text>
+                                <text x="50" y="66" textAnchor="middle" fill="#10B981" fontSize="10" fontWeight="bold" fontFamily="sans-serif" letterSpacing="0.5">
+                                  SIGNED
+                                </text>
+                                <circle cx="50" cy="50" r="45" fill="none" stroke="#10B981" strokeWidth="2.5" strokeDasharray="3,3" />
+                                <text x="50" y="78" textAnchor="middle" fill="#10B981" fontSize="7" fontFamily="sans-serif">
+                                  SECURE
+                                </text>
+                              </svg>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-350 mb-1">{t('commentNoteOptional')}</label>
+                      <textarea
+                        value={comment}
+                        onChange={e => setComment(e.target.value)}
+                        className="input h-16 resize-none text-xs"
+                        placeholder={t('addCommentNotePlaceholder')}
+                      />
+                    </div>
+
+                    <div className="flex items-start gap-2 bg-slate-50 dark:bg-slate-900 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
+                      <input
+                        type="checkbox"
+                        id="eSignConsent"
+                        checked={agreed}
+                        onChange={e => setAgreed(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <label htmlFor="eSignConsent" className="text-xs text-slate-500 leading-relaxed cursor-pointer select-none">
+                        {t('consentText')}
+                      </label>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        className="flex-1 btn-secondary text-xs cursor-pointer py-2"
+                        onClick={() => setModalAction(null)}
+                      >
+                        {t('goBack')}
+                      </button>
+                      <button
+                        type="button"
+                        className="flex-2 flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-emerald-500 text-white hover:bg-emerald-600 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        onClick={() => handleApprovalResponse('approved')}
+                        disabled={!agreed || (sigType === 'typed' ? !typedName.trim() : !initials.trim())}
+                      >
+                        <CheckCheck size={16} /> {t('signApprove')}
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4 animate-fadeIn">
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-navy-900 dark:text-white flex items-center gap-1.5 mb-1.5">
+                        🛡️ {sigProvider === 'docusign' ? 'DocuSign' : 'Zoho Sign'} Secure Signature Protocol
+                      </p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Upon clicking launch, you will be redirected to the secure {sigProvider === 'docusign' ? 'DocuSign sandbox' : 'Zoho Sign sandbox'} environment to verify, sign, and approve this deliverable legally. Once signed, you will be automatically returned to your project portal dashboard.
+                      </p>
+                    </div>
+
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">{t('initialsPlaceholder')} *</label>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-350 mb-1">Authorized Signer Name *</label>
                       <input
                         type="text"
-                        className="input font-mono uppercase"
-                        placeholder="e.g. JD"
-                        maxLength={3}
-                        value={initials}
-                        onChange={e => setInitials(e.target.value)}
+                        value={typedName}
+                        onChange={e => setTypedName(e.target.value)}
+                        placeholder="e.g. Johnathan Doe"
+                        className="input"
                       />
                     </div>
-                    {initials.trim() && (
-                      <div className="bg-slate-50 rounded-xl p-4 flex flex-col items-center justify-center border border-slate-100">
-                        <span className="text-[10px] text-slate-400 block mb-2">{t('liveStampPreview')}</span>
-                        <div className="bg-white rounded-full p-1 shadow-sm border border-slate-200">
-                          <svg width="80" height="80" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="45" fill="none" stroke="#10B981" strokeWidth="2.5" strokeDasharray="3,3" />
-                            <circle cx="50" cy="50" r="40" fill="none" stroke="#10B981" strokeWidth="1.5" />
-                            <text x="50" y="47" textAnchor="middle" fill="#10B981" fontSize="22" fontWeight="bold" fontFamily="sans-serif">
-                              {initials.toUpperCase()}
-                            </text>
-                            <text x="50" y="66" textAnchor="middle" fill="#10B981" fontSize="10" fontWeight="bold" fontFamily="sans-serif" letterSpacing="0.5">
-                              SIGNED
-                            </text>
-                            <text x="50" y="78" textAnchor="middle" fill="#10B981" fontSize="7" fontFamily="sans-serif">
-                              SECURE
-                            </text>
-                          </svg>
-                        </div>
-                      </div>
-                    )}
+
+                    <div className="flex gap-3 justify-end pt-4 border-t border-slate-100 dark:border-slate-800 font-semibold">
+                      <button
+                        type="button"
+                        className="btn-secondary text-xs cursor-pointer py-2"
+                        onClick={() => setModalAction(null)}
+                      >
+                        {t('goBack')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!typedName.trim()) {
+                            toast.error('Signer name is required.')
+                            return
+                          }
+                          try {
+                            const res = await api.post(`/approvals/${approvalModal}/${sigProvider}/create-envelope`)
+                            toast.success(`Redirecting to secure ${sigProvider === 'docusign' ? 'DocuSign' : 'Zoho Sign'} session...`)
+                            const targetUrl = `${res.data.url}&signer=${encodeURIComponent(typedName)}`
+                            setTimeout(() => {
+                              window.location.href = targetUrl
+                            }, 1000)
+                          } catch (err: any) {
+                            toast.error(err.response?.data?.error || err.message)
+                          }
+                        }}
+                        disabled={!typedName.trim()}
+                        className="btn-primary text-xs justify-center cursor-pointer disabled:opacity-50 bg-blue-600 hover:bg-blue-700 text-white border-none"
+                      >
+                        Launch {sigProvider === 'docusign' ? 'DocuSign' : 'Zoho Sign'} Session
+                      </button>
+                    </div>
                   </div>
                 )}
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">{t('commentNoteOptional')}</label>
-                  <textarea
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    className="input h-16 resize-none text-xs"
-                    placeholder={t('addCommentNotePlaceholder')}
-                  />
-                </div>
-
-                <div className="flex items-start gap-2 bg-slate-50 rounded-xl p-3 border border-slate-100">
-                  <input
-                    type="checkbox"
-                    id="eSignConsent"
-                    checked={agreed}
-                    onChange={e => setAgreed(e.target.checked)}
-                    className="mt-0.5"
-                  />
-                  <label htmlFor="eSignConsent" className="text-xs text-slate-500 leading-relaxed cursor-pointer select-none">
-                    {t('consentText')}
-                  </label>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    className="flex-1 btn-secondary text-xs cursor-pointer py-2"
-                    onClick={() => setModalAction(null)}
-                  >
-                    {t('goBack')}
-                  </button>
-                  <button
-                    type="button"
-                    className="flex-2 flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm bg-emerald-500 text-white hover:bg-emerald-600 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    onClick={() => handleApprovalResponse('approved')}
-                    disabled={!agreed || (sigType === 'typed' ? !typedName.trim() : !initials.trim())}
-                  >
-                    <CheckCheck size={16} /> {t('signApprove')}
-                  </button>
-                </div>
               </div>
             ) : (
               <div className="space-y-3 animate-fadeIn">

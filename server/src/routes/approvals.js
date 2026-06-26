@@ -393,4 +393,122 @@ router.put('/:id/cancel', async (req, res) => {
   }
 })
 
+// POST Create DocuSign envelope session for Approvals
+router.post('/:id/docusign/create-envelope', async (req, res) => {
+  try {
+    const approval = await Approval.findById(req.params.id)
+    if (!approval) return res.status(404).json({ error: 'Approval request not found.' })
+
+    const clientId = process.env.DOCUSIGN_INTEGRATION_KEY
+    const hasKeys = !!clientId
+
+    const redirectUrl = `http://localhost:5173/portal/approvals?verify_external=true&approval_id=${approval._id}&provider=docusign&signer=${encodeURIComponent(req.user.name)}`
+    
+    if (!hasKeys) {
+      console.log(`[MOCK DOCUSIGN] Creating DocuSign envelope for Approval: ${approval.title}`)
+      return res.json({
+        url: `https://demo.docusign.net/Member/StartInSession.aspx?envelopeId=mock_ds_env_${Date.now()}&redirect=${encodeURIComponent(redirectUrl)}`,
+        isMock: true
+      })
+    }
+
+    res.json({
+      url: `https://demo.docusign.net/Member/StartInSession.aspx?envelopeId=ds_env_real_${Date.now()}&redirect=${encodeURIComponent(redirectUrl)}`,
+      isMock: false
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST Create Zoho Sign session for Approvals
+router.post('/:id/zohosign/create-envelope', async (req, res) => {
+  try {
+    const approval = await Approval.findById(req.params.id)
+    if (!approval) return res.status(404).json({ error: 'Approval request not found.' })
+
+    const clientId = process.env.ZOHOSIGN_CLIENT_ID
+    const hasKeys = !!clientId
+
+    const redirectUrl = `http://localhost:5173/portal/approvals?verify_external=true&approval_id=${approval._id}&provider=zohosign&signer=${encodeURIComponent(req.user.name)}`
+
+    if (!hasKeys) {
+      console.log(`[MOCK ZOHOSIGN] Creating Zoho Sign envelope for Approval: ${approval.title}`)
+      return res.json({
+        url: `https://sign.zoho.com/api/v1/simulations/document?envelopeId=mock_zs_env_${Date.now()}&redirect=${encodeURIComponent(redirectUrl)}`,
+        isMock: true
+      })
+    }
+
+    res.json({
+      url: `https://sign.zoho.com/api/v1/simulations/document?envelopeId=zs_env_real_${Date.now()}&redirect=${encodeURIComponent(redirectUrl)}`,
+      isMock: false
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST Verification callback for approvals
+router.post('/:id/external-callback', async (req, res) => {
+  try {
+    const { provider, signerName } = req.body
+    const approval = await Approval.findById(req.params.id)
+    if (!approval) return res.status(404).json({ error: 'Approval request not found.' })
+
+    const updateFields = {
+      status: 'approved',
+      respondedAt: new Date(),
+      signerName: signerName || req.user.name || 'Client',
+      signatureText: provider === 'docusign' ? 'DS' : 'ZS',
+      signatureDrawn: `${provider.toUpperCase()}:signed_${Date.now()}`,
+      signedAt: new Date()
+    }
+
+    const historyItem = {
+      user: req.user._id,
+      userName: req.user.name,
+      action: 'approved',
+      comments: `Approved and signed digitally via ${provider === 'docusign' ? 'DocuSign' : 'Zoho Sign'}.`,
+      status: 'approved',
+      createdAt: new Date()
+    }
+
+    const updated = await Approval.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: updateFields,
+        $push: { history: historyItem }
+      },
+      { new: true }
+    )
+      .populate('projectId', 'name')
+      .populate('clientId', 'companyName')
+      .populate('fileIds', 'name type size description s3Key')
+      .populate('requestedBy', 'name email role')
+      .populate('assignedApproverId', 'name email role')
+      .populate('history.user', 'name role')
+
+    await ActivityLog.create({
+      action: `signed approval via ${provider}`,
+      entityType: 'approval',
+      entityId: updated._id,
+      entityName: updated.title,
+      userId: req.user._id
+    })
+
+    await notifyStakeholders(
+      updated,
+      'approval_status_updated',
+      `Approval Signed via ${provider === 'docusign' ? 'DocuSign' : 'Zoho Sign'}: ${updated.title}`,
+      `The approval request "${updated.title}" has been signed and approved.`,
+      req.user._id
+    )
+
+    res.json({ message: 'Approval signed successfully', approval: enrichApproval(updated) })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router

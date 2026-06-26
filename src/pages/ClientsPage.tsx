@@ -835,7 +835,7 @@ export default function ClientsPage() {
 
                       {/* Stage transition buttons */}
                       {!isReadOnly && (
-                        <div className="flex justify-between items-center pt-1 border-t border-slate-55" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800" onClick={e => e.stopPropagation()}>
                           <div className="flex gap-1.5">
                             {col.id !== 'lead' && (
                               <button

@@ -125,12 +125,21 @@ export default function PortalProjectsPage() {
                   <Progress value={project.progress} />
                   
                   {project.teamMembers && project.teamMembers.length > 0 && (
-                    <div className="flex items-center gap-1.5 mt-4">
-                      <Users size={12} className="text-slate-400" />
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase mr-1">{t('assignee')}:</span>
-                      <div className="flex -space-x-1">
+                    <div className="mt-4 flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Users size={12} className="text-slate-400" />
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('assignee')}:</span>
+                      </div>
+                      <div className="grid grid-cols-1 gap-1.5">
                         {project.teamMembers.map((member: any) => (
-                          <Avatar key={member.id} name={member.name} size="sm" />
+                          <div
+                            key={member.id || member._id}
+                            className="border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-center w-full shadow-sm"
+                          >
+                            <span className="text-xs font-semibold text-slate-850 dark:text-slate-200">
+                              {member.name}
+                            </span>
+                          </div>
                         ))}
                       </div>
                     </div>

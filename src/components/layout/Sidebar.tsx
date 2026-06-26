@@ -35,6 +35,7 @@ const clientNav = [
   { label: 'Approvals', icon: ShieldCheck, to: '/portal/approvals' },
   { label: 'Contracts', icon: PenTool, to: '/portal/contracts' },
   { label: 'Invoices', icon: Receipt, to: '/portal/invoices' },
+  { label: 'My Payments', icon: CreditCard, to: '/portal/payments' },
   { label: 'Support Center', icon: ClipboardList, to: '/portal/support' },
   { label: 'My Profile', icon: Settings, to: '/portal/profile' },
 ]
@@ -93,6 +94,7 @@ export function Sidebar() {
       'My Projects': 'projects',
       'My Files': 'files',
       'My Tasks': 'tasks',
+      'My Payments': 'payments',
       'Support Center': 'Support Center',
       'My Profile': 'settings',
       'Support Tickets': 'Support Tickets',

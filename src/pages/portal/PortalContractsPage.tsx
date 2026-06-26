@@ -29,6 +29,7 @@ export default function PortalContractsPage() {
   const [signerName, setSignerName] = useState('')
   const [signatureText, setSignatureText] = useState('')
   const [selectedFont, setSelectedFont] = useState('font-1')
+  const [signProvider, setSignProvider] = useState<'local' | 'docusign' | 'zohosign'>('local')
 
   const fetchContracts = () => {
     setLoading(true)
@@ -46,6 +47,34 @@ export default function PortalContractsPage() {
   useEffect(() => {
     fetchContracts()
   }, [])
+
+  // External signature redirect callback verifier
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const verifyExternal = params.get('verify_external')
+    const contractId = params.get('contract_id')
+    const provider = params.get('provider')
+    const signer = params.get('signer')
+
+    if (verifyExternal === 'true' && contractId && provider) {
+      toast.info(`Verifying external signature via ${provider === 'docusign' ? 'DocuSign' : 'Zoho Sign'}...`)
+      
+      api.post(`/contracts/${contractId}/external-callback`, {
+        provider,
+        signerName: signer || user?.name || 'Authorized Signer'
+      })
+        .then(() => {
+          toast.success(`Contract signed successfully via ${provider === 'docusign' ? 'DocuSign' : 'Zoho Sign'}!`)
+          // Clean parameters from url
+          const cleanUrl = window.location.pathname
+          window.history.replaceState({}, document.title, cleanUrl)
+          fetchContracts()
+        })
+        .catch(err => {
+          toast.error(err.response?.data?.error || err.message)
+        })
+    }
+  }, [user])
 
   const handleSignContract = () => {
     if (!signerName.trim() || !signatureText.trim()) {
@@ -147,7 +176,15 @@ export default function PortalContractsPage() {
                         <p className="font-bold text-xs">Agreement Legally Signed</p>
                         <p className="text-xs font-medium mt-1">Signer: <span className="font-semibold">{selectedContract.signerName}</span></p>
                         <p className="text-xs font-medium">Initials: <span className="font-semibold">{selectedContract.signatureText}</span></p>
-                        <p className="text-[10px] text-emerald-600 mt-1">Timestamp: {formatDate(selectedContract.signedAt)}</p>
+                        <p className="text-[10px] text-emerald-650 mt-1">
+                          Timestamp: {formatDate(selectedContract.signedAt)}
+                          {selectedContract.signatureDrawn && selectedContract.signatureDrawn.startsWith('DOCUSIGN') && (
+                            <span className="block text-[9px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">🔒 Verified via DocuSign</span>
+                          )}
+                          {selectedContract.signatureDrawn && selectedContract.signatureDrawn.startsWith('ZOHOSIGN') && (
+                            <span className="block text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">🔒 Verified via Zoho Sign</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   ) : (
@@ -175,74 +212,155 @@ export default function PortalContractsPage() {
       {/* SIGN MODAL */}
       <Modal open={signOpen} onClose={() => setSignOpen(false)} title="Sign Statement of Work (SOW)" size="md">
         <div className="space-y-4">
-          <p className="text-xs text-slate-500">I declare that this e-signature serves as a binding verification of the deliverables scope and general terms listed in this document.</p>
+          <p className="text-xs text-slate-500">Choose your preferred signature provider to authorize this statement of work.</p>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Authorized Signer Name *</label>
-              <input
-                type="text"
-                value={signerName}
-                onChange={e => setSignerName(e.target.value)}
-                placeholder="e.g. Johnathan Doe"
-                className="w-full text-slate-800"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Signature Initials / Code *</label>
-              <input
-                type="text"
-                value={signatureText}
-                onChange={e => setSignatureText(e.target.value)}
-                placeholder="e.g. JD"
-                className="w-full text-slate-800"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-2">Signature Font Style</label>
-            <div className="grid grid-cols-3 gap-2">
-              {fonts.map(font => (
-                <button
-                  key={font.id}
-                  onClick={() => setSelectedFont(font.id)}
-                  className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
-                    selectedFont === font.id ? 'border-orange-500 bg-orange-50/20' : 'border-slate-200 hover:border-slate-350'
-                  }`}
-                >
-                  <span className="text-[10px] text-slate-400 block mb-1">{font.name}</span>
-                  <span style={{ fontFamily: font.family }} className="text-sm whitespace-nowrap">
-                    {signerName || 'Signature'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {signerName && (
-            <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center mt-2">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Signature Agreement Stamp</span>
-              <p
-                style={{ fontFamily: fonts.find(f => f.id === selectedFont)?.family }}
-                className="text-xl text-orange-600 py-3"
-              >
-                {signerName}
-              </p>
-              <span className="text-[10px] text-slate-400 font-medium">Initials ID: {signatureText || '—'}</span>
-            </div>
-          )}
-
-          <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
-            <button onClick={() => setSignOpen(false)} className="btn-secondary text-xs cursor-pointer py-2">Cancel</button>
+          {/* Provider Selection */}
+          <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs">
             <button
-              onClick={handleSignContract}
-              disabled={!signerName.trim() || !signatureText.trim()}
-              className="btn-primary text-xs justify-center cursor-pointer disabled:opacity-50"
+              onClick={() => setSignProvider('local')}
+              className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer ${
+                signProvider === 'local' ? 'bg-white dark:bg-slate-700 text-navy-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+              }`}
             >
-              Sign & Execute SOW
+              Zenith Local
+            </button>
+            <button
+              onClick={() => setSignProvider('docusign')}
+              className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer ${
+                signProvider === 'docusign' ? 'bg-white dark:bg-slate-700 text-navy-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+              }`}
+            >
+              DocuSign
+            </button>
+            <button
+              onClick={() => setSignProvider('zohosign')}
+              className={`flex-1 py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer ${
+                signProvider === 'zohosign' ? 'bg-white dark:bg-slate-700 text-navy-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+              }`}
+            >
+              Zoho Sign
             </button>
           </div>
+
+          {signProvider === 'local' ? (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Authorized Signer Name *</label>
+                  <input
+                    type="text"
+                    value={signerName}
+                    onChange={e => setSignerName(e.target.value)}
+                    placeholder="e.g. Johnathan Doe"
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Signature Initials / Code *</label>
+                  <input
+                    type="text"
+                    value={signatureText}
+                    onChange={e => setSignatureText(e.target.value)}
+                    placeholder="e.g. JD"
+                    className="input"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-2">Signature Font Style</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {fonts.map(font => (
+                    <button
+                      key={font.id}
+                      onClick={() => setSelectedFont(font.id)}
+                      className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer ${
+                        selectedFont === font.id ? 'border-orange-500 bg-orange-50/20' : 'border-slate-200 hover:border-slate-350'
+                      }`}
+                    >
+                      <span className="text-[10px] text-slate-400 block mb-1">{font.name}</span>
+                      <span style={{ fontFamily: font.family }} className="text-sm whitespace-nowrap">
+                        {signerName || 'Signature'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {signerName && (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center mt-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Signature Agreement Stamp</span>
+                  <p
+                    style={{ fontFamily: fonts.find(f => f.id === selectedFont)?.family }}
+                    className="text-xl text-orange-600 py-3"
+                  >
+                    {signerName}
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-medium">Initials ID: {signatureText || '—'}</span>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
+                <button onClick={() => setSignOpen(false)} className="btn-secondary text-xs cursor-pointer py-2">Cancel</button>
+                <button
+                  onClick={handleSignContract}
+                  disabled={!signerName.trim() || !signatureText.trim()}
+                  className="btn-primary text-xs justify-center cursor-pointer disabled:opacity-50"
+                >
+                  Sign & Execute SOW
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 animate-fadeIn">
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl p-4">
+                <p className="text-xs font-semibold text-navy-900 dark:text-white flex items-center gap-1.5 mb-1.5">
+                  🛡️ {signProvider === 'docusign' ? 'DocuSign' : 'Zoho Sign'} Secure Signature Protocol
+                </p>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Upon clicking launch, you will be redirected to the secure {signProvider === 'docusign' ? 'DocuSign sandbox' : 'Zoho Sign sandbox'} environment to verify, sign, and complete your contract legally. Once signed, you will be automatically returned to your portal dashboard.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Authorized Signer Name *</label>
+                <input
+                  type="text"
+                  value={signerName}
+                  onChange={e => setSignerName(e.target.value)}
+                  placeholder="e.g. Johnathan Doe"
+                  className="input"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button onClick={() => setSignOpen(false)} className="btn-secondary text-xs cursor-pointer py-2">Cancel</button>
+                <button
+                  onClick={async () => {
+                    if (!signerName.trim()) {
+                      toast.error('Signer name is required.')
+                      return
+                    }
+                    try {
+                      const res = await api.post(`/contracts/${selected}/${signProvider}/create-envelope`)
+                      toast.success(`Redirecting to secure ${signProvider === 'docusign' ? 'DocuSign' : 'Zoho Sign'} session...`)
+                      // Append signer name to redirect URL
+                      const targetUrl = `${res.data.url}&signer=${encodeURIComponent(signerName)}`
+                      setTimeout(() => {
+                        window.location.href = targetUrl
+                      }, 1000)
+                    } catch (err: any) {
+                      toast.error(err.response?.data?.error || err.message)
+                    }
+                  }}
+                  disabled={!signerName.trim()}
+                  className="btn-primary text-xs justify-center cursor-pointer disabled:opacity-50 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Launch {signProvider === 'docusign' ? 'DocuSign' : 'Zoho Sign'} Session
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
     </Layout>

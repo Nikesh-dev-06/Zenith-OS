@@ -312,7 +312,7 @@ export default function PortalProposalsPage() {
                   onChange={(e) => setConsent(e.target.checked)}
                   className="mt-0.5"
                 />
-                <label htmlFor="propConsent" className="text-xs text-slate-505 leading-relaxed cursor-pointer select-none">
+                <label htmlFor="propConsent" className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed cursor-pointer select-none">
                   I agree that checking this box and typing my name constitutes a binding digital signature approving this Scope of Work.
                 </label>
               </div>

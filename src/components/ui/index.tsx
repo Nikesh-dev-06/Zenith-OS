@@ -160,21 +160,25 @@ interface ModalProps {
 
 export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   if (!open) return null
-  const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' }
+  const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-4xl' } // upgraded lg to 4xl for wide views like invoice preview
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className={`bg-white rounded-2xl shadow-2xl w-full ${sizes[size]} animate-slide-up`}
+        className={`bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-2xl w-full ${sizes[size]} animate-slide-up flex flex-col max-h-[90vh] overflow-hidden`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h3 className="font-semibold text-base text-navy-900">{title}</h3>
-          <button onClick={onClose} className="btn-ghost p-1.5">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
+          <h3 className="font-semibold text-base text-navy-900 dark:text-white">{title}</h3>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 dark:text-slate-400 dark:hover:text-white transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+            aria-label="Close modal"
+          >
             <X size={16} />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">{children}</div>
       </div>
     </div>
   )
@@ -269,7 +273,7 @@ export function ConfirmationModal({
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm animate-slide-up p-6"
+        className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm animate-slide-up p-6"
         onClick={e => e.stopPropagation()}
       >
         <h3 className="font-bold text-lg text-navy-900 mb-2">{title}</h3>

@@ -358,7 +358,7 @@ export default function TasksPage() {
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-55">
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
                         <div className="flex items-center gap-1.5">
                           <Avatar name={task.assigneeName} size="sm" />
                           <span className="text-xs text-slate-500">{task.assigneeName?.split(' ')[0]}</span>
@@ -378,7 +378,7 @@ export default function TasksPage() {
                           <select
                             value={task.status}
                             onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value as any)}
-                            className="text-xs bg-slate-55 border border-slate-200 rounded p-1 font-semibold text-slate-700"
+                            className="text-xs bg-slate-50 border border-slate-200 rounded p-1 font-semibold text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
                           >
                             <option value="pending">{t('taskPending')}</option>
                             <option value="in_progress">{t('taskInProgress')}</option>
@@ -388,10 +388,10 @@ export default function TasksPage() {
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-50 flex justify-between items-center text-[10px] text-slate-400">
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
                         <span>{t('dueDate')}: {formatDate(task.dueDate)}</span>
                         {task.totalLoggedTime > 0 && (
-                          <span className="bg-slate-50 px-1.5 py-0.5 rounded font-mono text-slate-505 font-semibold flex items-center gap-0.5">
+                          <span className="bg-slate-50 px-1.5 py-0.5 rounded font-mono text-slate-500 font-semibold flex items-center gap-0.5 dark:bg-slate-800 dark:text-slate-300">
                             <Clock size={9} /> {task.totalLoggedTime}m
                           </span>
                         )}
@@ -628,16 +628,16 @@ export default function TasksPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('assignee')}</span>
-                <div className="flex items-center gap-2 mt-1 bg-slate-55 border border-slate-100 rounded-xl p-2.5">
+                <div className="flex items-center gap-2 mt-1 bg-slate-50 border border-slate-100 rounded-xl p-2.5 dark:bg-slate-800/40 dark:border-slate-800">
                   <Avatar name={detailTask.assigneeName} size="sm" />
-                  <span className="text-xs font-semibold text-slate-700">{detailTask.assigneeName}</span>
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{detailTask.assigneeName}</span>
                 </div>
               </div>
               <div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('dueDate')}</span>
-                <div className="flex items-center gap-2 mt-1 bg-slate-55 border border-slate-100 rounded-xl p-2.5">
+                <div className="flex items-center gap-2 mt-1 bg-slate-50 border border-slate-100 rounded-xl p-2.5 dark:bg-slate-800/40 dark:border-slate-800">
                   <Calendar size={14} className="text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-700">{formatDate(detailTask.dueDate)}</span>
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{formatDate(detailTask.dueDate)}</span>
                 </div>
               </div>
             </div>

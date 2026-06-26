@@ -248,11 +248,11 @@ export default function ContractsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Contract / SOW Title *</label>
-              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Master Service Agreement 2026" className="w-full text-slate-800" />
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Master Service Agreement 2026" className="input" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Client *</label>
-              <select value={clientId} onChange={e => setClientId(e.target.value)} required className="w-full text-slate-800">
+              <select value={clientId} onChange={e => setClientId(e.target.value)} required className="input">
                 <option value="">Select Client</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
               </select>
@@ -262,7 +262,7 @@ export default function ContractsPage() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Project Link (Optional)</label>
-              <select value={projectId} onChange={e => setProjectId(e.target.value)} className="w-full text-slate-800">
+              <select value={projectId} onChange={e => setProjectId(e.target.value)} className="input">
                 <option value="">No Project Link (Standalone)</option>
                 {projects.filter(p => !clientId || p.clientId === clientId).map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -271,22 +271,22 @@ export default function ContractsPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Valid From</label>
-              <input type="date" value={validFrom} onChange={e => setValidFrom(e.target.value)} className="w-full text-slate-800" />
+              <input type="date" value={validFrom} onChange={e => setValidFrom(e.target.value)} className="input" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Valid To</label>
-              <input type="date" value={validTo} onChange={e => setValidTo(e.target.value)} className="w-full text-slate-800" />
+              <input type="date" value={validTo} onChange={e => setValidTo(e.target.value)} className="input" />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Contract Terms / Statement of Work Content *</label>
-            <textarea rows={8} value={content} onChange={e => setContent(e.target.value)} required placeholder="Enter statement of work milestones, deliverables details, SLA guidelines and cancelation clauses..." className="w-full text-slate-800 rounded-xl font-mono text-xs" />
+            <textarea rows={8} value={content} onChange={e => setContent(e.target.value)} required placeholder="Enter statement of work milestones, deliverables details, SLA guidelines and cancelation clauses..." className="input font-mono text-xs h-32" />
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Provisions Notes (Internal/Optional)</label>
-            <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Requires manager approval before signature update..." className="w-full text-slate-800 rounded-xl" />
+            <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Requires manager approval before signature update..." className="input h-16 resize-none" />
           </div>
 
           <div className="flex gap-3 justify-end pt-3 border-t border-slate-100">
@@ -309,7 +309,7 @@ export default function ContractsPage() {
                 value={signerName} 
                 onChange={e => setSignerName(e.target.value)} 
                 placeholder="e.g. Johnathan Doe" 
-                className="w-full text-slate-800"
+                className="input"
               />
             </div>
             <div>
@@ -319,7 +319,7 @@ export default function ContractsPage() {
                 value={signatureText} 
                 onChange={e => setSignatureText(e.target.value)} 
                 placeholder="e.g. JD" 
-                className="w-full text-slate-800"
+                className="input"
               />
             </div>
           </div>

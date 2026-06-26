@@ -8,6 +8,12 @@ import { useToast } from '../../context/ToastContext'
 import { useLanguage } from '../../context/LanguageContext'
 import api from '../../lib/api'
 
+declare global {
+  interface Window {
+    paypal?: any;
+  }
+}
+
 export default function PortalInvoicesPage() {
   const { user } = useAuth()
   const { t } = useLanguage()
@@ -25,6 +31,81 @@ export default function PortalInvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null)
   const [selectedInvoiceForModal, setSelectedInvoiceForModal] = useState<any>(null)
   const [paymentOrderId, setPaymentOrderId] = useState<string>('')
+  const [paypalLoaded, setPaypalLoaded] = useState(false)
+
+  // Effect to load PayPal SDK script dynamically
+  useEffect(() => {
+    if (showRazorpay && selectedMethod === 'paypal' && selectedInvoice && import.meta.env.VITE_PAYPAL_CLIENT_ID) {
+      if (window.paypal) {
+        setPaypalLoaded(true)
+        return
+      }
+
+      const script = document.createElement('script')
+      const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID
+      const currency = selectedInvoice.currency || 'USD'
+      script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}`
+      script.async = true
+      script.onload = () => {
+        setPaypalLoaded(true)
+      }
+      script.onerror = () => {
+        toast.error('Failed to load PayPal SDK script')
+      }
+      document.body.appendChild(script)
+
+      return () => {
+        // clean up script
+      }
+    } else {
+      setPaypalLoaded(false)
+    }
+  }, [showRazorpay, selectedMethod, selectedInvoice])
+
+  // Effect to render PayPal smart buttons
+  useEffect(() => {
+    if (paypalLoaded && selectedMethod === 'paypal' && window.paypal && selectedInvoice) {
+      const container = document.getElementById('paypal-button-container')
+      if (container) {
+        container.innerHTML = ''
+      }
+
+      window.paypal.Buttons({
+        createOrder: async () => {
+          try {
+            const res = await api.post('/payments/paypal/create-order', {
+              invoiceId: selectedInvoice.id
+            })
+            return res.data.order.id
+          } catch (err: any) {
+            console.error('PayPal create order failed:', err)
+            toast.error('PayPal Order initialization failed')
+            throw err
+          }
+        },
+        onApprove: async (data: any) => {
+          setPayStep('processing')
+          try {
+            await api.post('/payments/paypal/capture-order', {
+              paypalOrderId: data.orderID,
+              invoiceId: selectedInvoice.id,
+              isMock: false
+            })
+            setPayStep('success')
+            fetchData()
+          } catch (err: any) {
+            console.error('PayPal capture payment failed:', err)
+            toast.error(err.response?.data?.error || err.message)
+            setPayStep('method')
+          }
+        },
+        onError: (err: any) => {
+          console.error('PayPal smart buttons error:', err)
+          toast.error('PayPal transaction encountered an error')
+        }
+      }).render('#paypal-button-container')
+    }
+  }, [paypalLoaded, selectedMethod, selectedInvoice])
 
   const fetchData = async () => {
     if (!user?.clientId) return
@@ -195,7 +276,7 @@ export default function PortalInvoicesPage() {
       )}
 
       {/* Razorpay Simulation Modal */}
-      <Modal open={showRazorpay} onClose={() => { setShowRazorpay(false); setPayStep('method'); }} title={t('simulatePayment')} size="sm">
+      <Modal open={showRazorpay} onClose={() => { setShowRazorpay(false); setPayStep('method'); setSelectedMethod(''); setPaypalLoaded(false); }} title={t('simulatePayment')} size="sm">
         {payStep === 'method' && selectedInvoice && (
           <div className="space-y-4">
             <div className="bg-slate-50 rounded-xl p-4 text-center">
@@ -228,13 +309,45 @@ export default function PortalInvoicesPage() {
               ))}
             </div>
 
-            <button
-              className="btn-primary w-full justify-center py-2.5 mt-2 cursor-pointer"
-              disabled={!selectedMethod}
-              onClick={handleVerifyPayment}
-            >
-              {t('pay')} {formatCurrency(selectedInvoice.total, selectedInvoice.currency)}
-            </button>
+            {selectedMethod === 'paypal' && !import.meta.env.VITE_PAYPAL_CLIENT_ID ? (
+              <button
+                className="btn-primary w-full justify-center py-2.5 mt-2 cursor-pointer bg-blue-600 hover:bg-blue-700"
+                onClick={async () => {
+                  setPayStep('processing');
+                  setTimeout(async () => {
+                    try {
+                      await api.post('/payments/paypal/capture-order', {
+                        paypalOrderId: `pp_order_mock_${Date.now()}`,
+                        invoiceId: selectedInvoice.id,
+                        isMock: true
+                      });
+                      setPayStep('success');
+                      fetchData();
+                    } catch (err: any) {
+                      toast.error(err.response?.data?.error || err.message);
+                      setPayStep('method');
+                    }
+                  }, 1500);
+                }}
+              >
+                Simulate PayPal Sandbox Payment
+              </button>
+            ) : selectedMethod === 'paypal' ? (
+              <div className="mt-4 min-h-[50px]">
+                {!paypalLoaded && (
+                  <div className="text-center text-xs text-slate-500 py-3 animate-pulse">Loading PayPal Checkout...</div>
+                )}
+                <div id="paypal-button-container" className="w-full animate-fadeIn" />
+              </div>
+            ) : (
+              <button
+                className="btn-primary w-full justify-center py-2.5 mt-2 cursor-pointer"
+                disabled={!selectedMethod}
+                onClick={handleVerifyPayment}
+              >
+                {t('pay')} {formatCurrency(selectedInvoice.total, selectedInvoice.currency)}
+              </button>
+            )}
           </div>
         )}
 
@@ -338,17 +451,17 @@ export default function PortalInvoicesPage() {
                       <>
                         <div className="flex justify-between text-slate-500 pl-2">
                           <span>{t('cgst')} ({(selectedInvoiceForModal.taxRate || 18) / 2}%)</span>
-                          <span>{formatCurrency(selectedInvoiceForModal.cgst ?? Math.round((selectedInvoiceForModal.subtotal - selectedInvoiceForModal.discount) * ((selectedInvoiceForModal.taxRate || 18) / 2) / 100), selectedInvoiceForModal.currency)}</span>
+                          <span>{formatCurrency(selectedInvoiceForModal.cgst || Math.round((selectedInvoiceForModal.subtotal - selectedInvoiceForModal.discount) * ((selectedInvoiceForModal.taxRate || 18) / 2) / 100), selectedInvoiceForModal.currency)}</span>
                         </div>
                         <div className="flex justify-between text-slate-500 pl-2">
                           <span>{t('sgst')} ({(selectedInvoiceForModal.taxRate || 18) / 2}%)</span>
-                          <span>{formatCurrency(selectedInvoiceForModal.sgst ?? Math.round((selectedInvoiceForModal.subtotal - selectedInvoiceForModal.discount) * ((selectedInvoiceForModal.taxRate || 18) / 2) / 100), selectedInvoiceForModal.currency)}</span>
+                          <span>{formatCurrency(selectedInvoiceForModal.sgst || Math.round((selectedInvoiceForModal.subtotal - selectedInvoiceForModal.discount) * ((selectedInvoiceForModal.taxRate || 18) / 2) / 100), selectedInvoiceForModal.currency)}</span>
                         </div>
                       </>
                     ) : (
                       <div className="flex justify-between text-slate-500 pl-2">
                         <span>{t('igst')} ({selectedInvoiceForModal.taxRate || 18}%)</span>
-                        <span>{formatCurrency(selectedInvoiceForModal.igst ?? Math.round((selectedInvoiceForModal.subtotal - selectedInvoiceForModal.discount) * (selectedInvoiceForModal.taxRate || 18) / 100), selectedInvoiceForModal.currency)}</span>
+                        <span>{formatCurrency(selectedInvoiceForModal.igst || Math.round((selectedInvoiceForModal.subtotal - selectedInvoiceForModal.discount) * (selectedInvoiceForModal.taxRate || 18) / 100), selectedInvoiceForModal.currency)}</span>
                       </div>
                     )}
                     {selectedInvoiceForModal.rcm && (

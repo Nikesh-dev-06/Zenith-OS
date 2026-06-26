@@ -684,17 +684,17 @@ export default function InvoicesPage() {
                       <>
                         <div className="flex justify-between text-xs text-slate-500 pl-2">
                           <span>{t('cgst')} ({(selectedInvoice.taxRate || 18) / 2}%)</span>
-                          <span>{formatCurrency(selectedInvoice.cgst ?? Math.round((selectedInvoice.subtotal - selectedInvoice.discount) * ((selectedInvoice.taxRate || 18) / 2) / 100))}</span>
+                          <span>{formatCurrency(selectedInvoice.cgst || Math.round((selectedInvoice.subtotal - selectedInvoice.discount) * ((selectedInvoice.taxRate || 18) / 2) / 100))}</span>
                         </div>
                         <div className="flex justify-between text-xs text-slate-500 pl-2">
                           <span>{t('sgst')} ({(selectedInvoice.taxRate || 18) / 2}%)</span>
-                          <span>{formatCurrency(selectedInvoice.sgst ?? Math.round((selectedInvoice.subtotal - selectedInvoice.discount) * ((selectedInvoice.taxRate || 18) / 2) / 100))}</span>
+                          <span>{formatCurrency(selectedInvoice.sgst || Math.round((selectedInvoice.subtotal - selectedInvoice.discount) * ((selectedInvoice.taxRate || 18) / 2) / 100))}</span>
                         </div>
                       </>
                     ) : (
                       <div className="flex justify-between text-xs text-slate-500 pl-2">
                         <span>{t('igst')} ({selectedInvoice.taxRate || 18}%)</span>
-                        <span>{formatCurrency(selectedInvoice.igst ?? Math.round((selectedInvoice.subtotal - selectedInvoice.discount) * (selectedInvoice.taxRate || 18) / 100))}</span>
+                        <span>{formatCurrency(selectedInvoice.igst || Math.round((selectedInvoice.subtotal - selectedInvoice.discount) * (selectedInvoice.taxRate || 18) / 100))}</span>
                       </div>
                     )}
                     {selectedInvoice.rcm && (
